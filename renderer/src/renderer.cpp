@@ -141,7 +141,7 @@ float4 pixelShader(const Texture& texture, const Varying fragVars)
         texture.data[index + 3]
     };
 
-    return texColor * fragVars.light * fragVars.color;
+    return texColor * fragVars.light;// *fragVars.color;
 }
 
 void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoords, const Varying* varying)
@@ -202,7 +202,7 @@ void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoor
             };
 
             float4 color = pixelShader(renderer->texture, fragVarying);
-
+            color.a = 1.f;
             drawPixel(fb.colorBuffer, fb.width, fb.height, i, j, color);
         }
     }
@@ -213,8 +213,10 @@ float4 vertexShader(const rdrVertex& vertex, const mat4x4& mvp, Varying& varying
     // Store triangle vertices positions
     float3 localCoords = { vertex.x, vertex.y, vertex.z };
 
-    varying.light = 1.f;
     varying.normale = { vertex.nx, vertex.ny, vertex.nz };
+
+    varying.light = 1.f;//saturate(-dot(varying.normale, { 0.5f, -0.5f, 0.f }));
+
     varying.color = { vertex.r, vertex.g, vertex.b, vertex.a };
     varying.u = vertex.u;
     varying.v = vertex.v;

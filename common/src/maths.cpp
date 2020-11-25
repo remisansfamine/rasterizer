@@ -107,3 +107,13 @@ float max(float value1, float value2)
 {
     return value1 <= value2 ? value2 : value1;
 }
+
+float saturate(float value)
+{
+    return min(max(value, 0.f), 1.f);
+}
+
+float dot(float3 v1, float3 v2)
+{
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}

@@ -123,3 +123,7 @@ float3 getSphericalCoords(float r, float theta, float phi);
 float min(float value1, float value2);
 
 float max(float value1, float value2);
+
+float saturate(float value);
+
+float dot(float3 v1, float3 v2);
