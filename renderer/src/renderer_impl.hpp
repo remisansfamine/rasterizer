@@ -6,9 +6,9 @@
 
 struct Varying
 {
-    float3 light;
+    float light;
     float3 normale;
-    float4 r, g, b, a;
+    float4 color;
     float u, v;
 };
 

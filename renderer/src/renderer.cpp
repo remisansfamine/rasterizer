@@ -115,8 +115,38 @@ float getWeight(const float3& a, const float3& b, const float3& c)
     return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
 
-void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoords, const rdrVertex* vertices)
+float4 pixelShader(const Texture& texture, const Varying fragVars)
 {
+    if (!texture.data)
+        return fragVars.light * fragVars.color;
+
+    int x = (texture.width) * fragVars.u;
+    int y = (texture.height) * fragVars.v;
+
+    x %= texture.width;
+    y %= texture.height;
+
+    if (x < 0)
+        x += texture.width;
+
+    if (y < 0)
+        y += texture.height;
+
+    int index = (((texture.width) * y) + x) * 4;
+    float4 texColor =
+    {
+        texture.data[index + 0],
+        texture.data[index + 1],
+        texture.data[index + 2],
+        texture.data[index + 3]
+    };
+
+    return texColor * fragVars.light * fragVars.color;
+}
+
+void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoords, const Varying* varying)
+{
+    // Get the bounding box
     int xMin = screenCoords[0].x, yMin = screenCoords[0].y, xMax = screenCoords[0].x, yMax = screenCoords[0].y;
 
     for (int i = 1; i < 3; i++)
@@ -133,6 +163,7 @@ void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoor
     {
         for (int j = yMin; j <= yMax; j++)
         {
+            // Check if the pixel is in the triangle foreach segment
             float3 pixel = { i + 0.5f, j + 0.5f, 0.f };
 
             float weight0 = getWeight(screenCoords[1], screenCoords[2], pixel);
@@ -151,6 +182,7 @@ void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoor
             weight1 /= triangleArea;
             weight2 = 1.f - weight0 - weight1;
 
+            // Depth test / z-buffer
             float z = weight0 * screenCoords[0].z + screenCoords[1].z * weight1 + screenCoords[2].z * weight2;
 
             if (fb.depthBuffer[j * fb.width + i] >= z && renderer->depthTest)
@@ -158,49 +190,48 @@ void rasterTriangle(rdrImpl* renderer, const Framebuffer& fb, float3* screenCoor
 
             fb.depthBuffer[j * fb.width + i] = z;
 
-            float u = weight0 * vertices[0].u + vertices[1].u * weight1 + vertices[2].u * weight2;
-            float v = weight0 * vertices[0].v + vertices[1].v * weight1 + vertices[2].v * weight2;
-
-            int x = (renderer->texture.width ) * u;
-            int y = (renderer->texture.height) * v;
-
-            x %= renderer->texture.width;
-            y %= renderer->texture.height;
-
-            if (x < 0)
-                x += renderer->texture.width;
-
-            if (y < 0)
-                y += renderer->texture.height;
-
-            int index = (((renderer->texture.width) * y) + x) * 4;
-            float4 color =
+            Varying fragVarying =
             {
-                renderer->texture.data[index + 0],
-                renderer->texture.data[index + 1],
-                renderer->texture.data[index + 2],
-                renderer->texture.data[index + 3]
+                weight0 * varying[0].light + varying[1].light * weight1 + varying[2].light * weight2,
+
+                weight0 * varying[0].normale + varying[1].normale * weight1 + varying[2].normale * weight2,
+                weight0 * varying[0].color + varying[1].color * weight1 + varying[2].color * weight2,
+
+                weight0 * varying[0].u + varying[1].u * weight1 + varying[2].u * weight2,
+                weight0 * varying[0].v + varying[1].v * weight1 + varying[2].v * weight2,
             };
+
+            float4 color = pixelShader(renderer->texture, fragVarying);
 
             drawPixel(fb.colorBuffer, fb.width, fb.height, i, j, color);
         }
     }
 }
 
-void drawTriangle(rdrImpl* renderer, const mat4x4& mvp, rdrVertex* vertices)
+float4 vertexShader(const rdrVertex& vertex, const mat4x4& mvp, Varying& varying)
 {
     // Store triangle vertices positions
-    float3 localCoords[3] = {
-        { vertices[0].x, vertices[0].y, vertices[0].z },
-        { vertices[1].x, vertices[1].y, vertices[1].z },
-        { vertices[2].x, vertices[2].y, vertices[2].z },
-    };
+    float3 localCoords = { vertex.x, vertex.y, vertex.z };
+
+    varying.light = 1.f;
+    varying.normale = { vertex.nx, vertex.ny, vertex.nz };
+    varying.color = { vertex.r, vertex.g, vertex.b, vertex.a };
+    varying.u = vertex.u;
+    varying.v = vertex.v;
+
+    return mvp * float4{ localCoords, 1.f };
+}
+
+void drawTriangle(rdrImpl* renderer, const mat4x4& mvp, rdrVertex* vertices)
+{
+    Varying varying[3];
 
     // Local space (v3) -> Clip space (v4)
-    float4 clipCoords[3] = {
-        { mvp * float4{ localCoords[0], 1.f } },
-        { mvp * float4{ localCoords[1], 1.f } },
-        { mvp * float4{ localCoords[2], 1.f } },
+    float4 clipCoords[3]
+    {
+        vertexShader(vertices[0], mvp, varying[0]),
+        vertexShader(vertices[1], mvp, varying[1]),
+        vertexShader(vertices[2], mvp, varying[2]),
     };
 
     // TODO: Subdivide in others triangles
@@ -208,7 +239,6 @@ void drawTriangle(rdrImpl* renderer, const mat4x4& mvp, rdrVertex* vertices)
         return;
 
     // Clip space (v4) to NDC (v3)
-    // TODO
     float3 ndcCoords[3] = {
         { clipCoords[0].xyz / clipCoords[0].w },
         { clipCoords[1].xyz / clipCoords[1].w },
@@ -216,7 +246,6 @@ void drawTriangle(rdrImpl* renderer, const mat4x4& mvp, rdrVertex* vertices)
     };
 
     // NDC (v3) to screen coords (v2)
-    // TODO
     float3 screenCoords[3] = {
         { ndcToScreenCoords(ndcCoords[0], renderer->viewport) },
         { ndcToScreenCoords(ndcCoords[1], renderer->viewport) },
@@ -232,7 +261,7 @@ void drawTriangle(rdrImpl* renderer, const mat4x4& mvp, rdrVertex* vertices)
     }
     else
         // Rasterize triangle
-        rasterTriangle(renderer, renderer->fb, screenCoords, vertices);
+        rasterTriangle(renderer, renderer->fb, screenCoords, varying);
 }
 
 void rdrDrawTriangles(rdrImpl* renderer, rdrVertex* vertices, int count)
