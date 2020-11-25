@@ -35,5 +35,5 @@ union mat4x4
 struct Texture
 {
     int width, height;
-    float* data;
+    float* data = nullptr;
 };

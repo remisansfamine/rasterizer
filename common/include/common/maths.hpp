@@ -88,6 +88,21 @@ inline mat4x4 operator*(const mat4x4& a, const mat4x4& b)
     return result;
 }
 
+inline float3 operator*(float3 v, float a)
+{
+    return { v.x * a, v.y * a, v.z * a };
+}
+
+inline float3 operator*(float a, float3 v)
+{
+    return { v * a };
+}
+
+inline float3 operator+(float3 v1, float3 v2)
+{
+    return { v1.x + v1.x, v1.y + v1.y, v1.z + v1.z };
+}
+
 inline float4 operator*(float4 v, float a)
 {
     return { v.x * a, v.y * a, v.z * a, v.w * a };
@@ -96,6 +111,11 @@ inline float4 operator*(float4 v, float a)
 inline float3 operator/(float3 v, float a)
 {
     return { v.x / a, v.y / a, v.z / a };
+}
+
+inline float4 operator*(float4 v1, float4 v2)
+{
+    return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v1.w * v2.w };
 }
 
 float3 getSphericalCoords(float r, float theta, float phi);

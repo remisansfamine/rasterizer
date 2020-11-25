@@ -29,9 +29,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\renderer.cpp">
-      <Filter>private</Filter>
-    </ClCompile>
     <ClCompile Include="..\common\src\maths.cpp">
       <Filter>private\common</Filter>
     </ClCompile>
@@ -42,6 +39,9 @@
       <Filter>private\third_party</Filter>
     </ClCompile>
     <ClCompile Include="..\third_party\src\imgui_widgets.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="src\renderer.cpp">
       <Filter>private\third_party</Filter>
     </ClCompile>
   </ItemGroup>

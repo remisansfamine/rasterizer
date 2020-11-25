@@ -80,7 +80,7 @@ void loadQuad(std::vector<rdrVertex>& vertices)
     vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
 
     vertices.push_back({ 0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,       0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
-    vertices.push_back({ -0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      1.0f, 1.0f, 1.0f, 1.f,     0.0f, 1.0f });
+    vertices.push_back({ -0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      1.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
     vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
 }
 
@@ -127,7 +127,7 @@ scnImpl::scnImpl()
     texture1.data = stbi_loadf("assets/danny.jpeg", &texture1.width, &texture1.height, nullptr, STBI_rgb_alpha);
 
     Texture texture2;
-    texture2.data = stbi_loadf("assets/axflar.png", &texture2.width, &texture2.height, nullptr, STBI_rgb_alpha);
+    texture2.data = stbi_loadf("assets/Deathclaw.png", &texture2.width, &texture2.height, nullptr, STBI_rgb_alpha);
 
     textures.push_back(texture1);
     textures.push_back(texture2);
@@ -136,7 +136,7 @@ scnImpl::scnImpl()
     loadQuad(obj1.vertices);
 
     Object obj2;
-    loadObject(obj2.vertices, "assets/sponza.obj", "assets", 0.005f);
+    loadObject(obj2.vertices, "assets/Deathclaw.obj", "assets", 0.005f);
 
     objects.push_back(obj1);
     objects.push_back(obj2);
