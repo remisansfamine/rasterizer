@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="src\renderer_impl.hpp">
+      <Filter>private</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rdr\renderer.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\include\common\types.hpp">
+      <Filter>private\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\include\common\maths.hpp">
+      <Filter>private\common</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="public">
+      <UniqueIdentifier>{fbbfc75b-b78d-42f4-bd2a-e64fe0b2d7a0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private">
+      <UniqueIdentifier>{69129f0f-19f5-4fca-a3a7-67605fa2e7f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private\common">
+      <UniqueIdentifier>{44524447-98ac-4a0c-9674-0242575c76ca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private\third_party">
+      <UniqueIdentifier>{64ef0cec-ea01-46c9-8725-3ba3a4950734}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\renderer.cpp">
+      <Filter>private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\src\maths.cpp">
+      <Filter>private\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_draw.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_widgets.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

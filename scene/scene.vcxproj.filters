@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="public">
+      <UniqueIdentifier>{0816b450-bf9a-4fc8-9482-b644b79c1849}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private">
+      <UniqueIdentifier>{9af58e74-0e26-47a7-a524-1df5c6a43d67}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private\common">
+      <UniqueIdentifier>{05c5bd00-179f-43e0-9b62-4868420dbd18}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private\third_party">
+      <UniqueIdentifier>{c471f236-ef11-4293-9232-ede7d5b4879e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\scene.cpp">
+      <Filter>private</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\src\maths.cpp">
+      <Filter>private\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_draw.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_widgets.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\tiny_obj_loader.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\stb_image.cpp">
+      <Filter>private\third_party</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\scn\scene.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="src\scene_impl.hpp">
+      <Filter>private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\include\common\maths.hpp">
+      <Filter>private\common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\include\common\types.hpp">
+      <Filter>private\common</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
