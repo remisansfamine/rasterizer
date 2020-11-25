@@ -1,0 +1,59 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="..\common\src\maths.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\glad.c">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_demo.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_draw.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_impl_glfw.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_impl_opengl3.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\imgui_widgets.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="src\framebuffer.cpp" />
+    <ClCompile Include="..\common\src\camera.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\third_party\src\msf_gif.cpp">
+      <Filter>third_party</Filter>
+    </ClCompile>
+    <ClCompile Include="src\gif_recorder.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\common\include\common\maths.hpp">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\include\common\types.hpp">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\framebuffer.hpp" />
+    <ClInclude Include="..\common\include\common\camera.hpp">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="src\gif_recorder.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="common">
+      <UniqueIdentifier>{bcda21d3-e74e-4d36-917e-74890728f0e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party">
+      <UniqueIdentifier>{6bd8b35d-7f69-4280-bc3b-e9adc16e7c63}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
