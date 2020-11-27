@@ -1,12 +1,33 @@
 #pragma once
 
-union float3
+union float2
 {
-    float e[3];
-    struct { float x; float y; float z; };
+    float2() = default;
+    float2(float x, float y)
+        : x(x), y(y)
+    {}
+
+    float e[2];
+    struct { float x; float y; };
+    struct { float u; float v; };
 };
 
-float3 operator-(const float3&);
+union float3
+{
+    float3() = default;
+    float3(float x, float y, float z)
+        : x(x), y(y), z(z)
+    {}
+
+    float3(float2 xy, float z)
+        : x(xy.x), y(xy.y), z(z)
+    {}
+
+    float e[3];
+    struct { float x; float y; float z; };
+    struct { float r; float g; float b; };
+    float2 xy;
+};
 
 union float4
 {
@@ -23,6 +44,7 @@ union float4
     struct { float x; float y; float z; float w; };
     struct { float r; float g; float b; float a; };
     float3 xyz;
+    float2 xy;
 };
 
 
@@ -36,4 +58,12 @@ struct Texture
 {
     int width, height;
     float* data = nullptr;
+};
+
+struct Light
+{
+    float3  lightPos;
+    float4  lightColor;
+    bool    isEnable;
+    float   lightPower;
 };

@@ -4,12 +4,31 @@
 
 #include <common/types.hpp>
 
+struct Uniform
+{
+    float time;
+    float deltaTime;
+
+    Light lights[8];
+
+    Texture texture;
+
+    mat4x4 mvp;
+    mat4x4 model;
+    mat4x4 view;
+    mat4x4 projection;
+
+    bool depthTest = true;
+    bool wireframeMode = false;
+    bool backFaceCulling = true;
+};
+
 struct Varying
 {
     float light;
-    float3 normale;
+    float3 normal;
     float4 color;
-    float u, v;
+    float2 uv;
 };
 
 struct Viewport
@@ -35,12 +54,5 @@ struct rdrImpl
 
     float4 lineColor = { 1.f, 1.f, 1.f, 1.f };
 
-    mat4x4 model;
-    mat4x4 view;
-    mat4x4 projection;
-
-    Texture texture;
-
-    bool depthTest = true;
-    bool wireframeMode = false;
+    Uniform uniform;
 };

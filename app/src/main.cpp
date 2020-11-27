@@ -251,7 +251,7 @@ int main(int argc, char* argv[])
         ImGui::End();
 
         //ImGui::ShowDemoWindow();
-
+        ImGui::ShowMetricsWindow();
         endFrame(window);
     }
 

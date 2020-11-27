@@ -13,7 +13,9 @@
 
 #include "common\maths.hpp"
 
-void loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::string mtlBasedir, float scale = 1.f)
+#include <iostream>
+
+bool loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::string mtlBasedir, float scale = 1.f)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -33,7 +35,7 @@ void loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::str
     }
 
     if (!ret) {
-        exit(1);
+        return 0;
     }
 
     // Loop over shapes
@@ -50,46 +52,61 @@ void loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::str
             {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 
-                vertices.push_back({
-                    attrib.vertices[3 * idx.vertex_index + 0] * scale,
-                    attrib.vertices[3 * idx.vertex_index + 1] * scale,
-                    attrib.vertices[3 * idx.vertex_index + 2] * scale,
-                    attrib.normals[3 * idx.normal_index + 0],
-                    attrib.normals[3 * idx.normal_index + 1],
-                    attrib.normals[3 * idx.normal_index + 2],
-                    attrib.colors[3 * idx.vertex_index + 0],
-                    attrib.colors[3 * idx.vertex_index + 1],
-                    attrib.colors[3 * idx.vertex_index + 2],
-                    1.f,
-                    attrib.texcoords[2 * idx.texcoord_index + 0],
-                    attrib.texcoords[2 * idx.texcoord_index + 1],
-                });
+                rdrVertex vertice;
+                vertice.x = attrib.vertices[3 * idx.vertex_index + 0] * scale;
+                vertice.y = attrib.vertices[3 * idx.vertex_index + 1] * scale;
+                vertice.z = attrib.vertices[3 * idx.vertex_index + 2] * scale;
+
+                if (!attrib.normals.empty())
+                {
+                    vertice.nx = attrib.normals[3 * idx.normal_index + 0];
+                    vertice.ny = attrib.normals[3 * idx.normal_index + 1];
+                    vertice.nz = attrib.normals[3 * idx.normal_index + 2];
+                }
+
+                if (!attrib.colors.empty())
+                {
+                    vertice.r = attrib.colors[3 * idx.vertex_index + 0];
+                    vertice.g = attrib.colors[3 * idx.vertex_index + 1];
+                    vertice.b = attrib.colors[3 * idx.vertex_index + 2];
+                    vertice.a = attrib.colors[3 * idx.vertex_index + 3];
+                }
+
+                if (!attrib.texcoords.empty())
+                {
+                    vertice.u = attrib.texcoords[2 * idx.texcoord_index + 0];
+                    vertice.v = attrib.texcoords[2 * idx.texcoord_index + 1];
+                }
+
+                vertices.push_back(vertice);
             }
             index_offset += fv;
 
             shapes[s].mesh.material_ids[f];
         }
     }
+
+    return 1;
 }
 
 void loadQuad(std::vector<rdrVertex>& vertices)
 {
     //                          pos                   normal                    color                  uv
-    vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
-    vertices.push_back({  0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      0.0f, 0.0f, 1.0f, 1.f,     1.0f, 0.0f });
-    vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
+    vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+    vertices.push_back({  0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     1.0f, 0.0f });
+    vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
 
-    vertices.push_back({ 0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,       0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
-    vertices.push_back({ -0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      1.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
-    vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 0.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+    vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
+    vertices.push_back({ -0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
+    vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
 }
 
 void loadTriangle(std::vector<rdrVertex>& vertices)
 {
     //                          pos                   normal                  color                     uv
-    vertices.push_back({-0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 0.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
-    vertices.push_back({ 0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 0.0f,      0.0f, 1.0f, 0.0f, 1.f,     0.5f, 0.5f });
-    vertices.push_back({ 0.0f,  0.5f, 0.0f,      0.0f, 0.0f, 0.0f,      0.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
+    vertices.push_back({-0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+    vertices.push_back({ 0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     0.5f, 0.5f });
+    vertices.push_back({ 0.0f,  0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
 }
 
 scnImpl* scnCreate()
@@ -134,12 +151,12 @@ scnImpl::scnImpl()
 
     Object obj1;
     loadQuad(obj1.vertices);
+    objects.push_back(obj1);
 
     Object obj2;
-    loadObject(obj2.vertices, "assets/Deathclaw.obj", "assets", 0.005f);
-
-    objects.push_back(obj1);
-    objects.push_back(obj2);
+    if (loadObject(obj2.vertices, "assets/car.obj", "assets", 0.005f))
+        objects.push_back(obj2);
+    
 }
 
 scnImpl::~scnImpl()
@@ -151,14 +168,39 @@ scnImpl::~scnImpl()
 
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
+    Light light =
+    {
+        {0.f, (sin((float)time) + 1.f) * 0.5f, 0.f},
+        {1.f, 0.f, 0.f, 1.f},
+        true,
+        1.f
+    };
+
+    Light light2 =
+    {
+        {0.f, (1.f - sin((float)time)) * 0.5f, 0.f},
+        {0.f, 1.f, 1.f, 1.f},
+        true,
+        1.f
+    };
+
+    rdrSetUniformLight(renderer, 0, (rdrLight*)&light);
+    rdrSetUniformLight(renderer, 1, (rdrLight*)&light2);
+
+    rdrSetUniformFloatV(renderer, rdrUniformType::UT_TIME, (float*)&time);
+    time += deltaTime;
+
     // HERE: Update (if needed) and display the scene
     rdrSetTexture(renderer, textures[0].data, textures[0].width, textures[0].height);
 
-    objects[0].model = mat4::translate({ 0.f, 0.f, -1.f })* mat4::scale({ 0.5f, 0.5f, 0.5f });
+    objects[0].model = mat4::translate({ 0.f, 0.f, -3.f }) * mat4::rotateY(time);
     rdrSetModel(renderer, objects[0].model.e);
 
     // Draw
     rdrDrawTriangles(renderer, objects[0].vertices.data(), (int)objects[0].vertices.size());
+
+    if (objects.size() <= 1)
+        return;
 
     rdrSetTexture(renderer, textures[1].data, textures[1].width, textures[1].height);
 
@@ -168,8 +210,6 @@ void scnImpl::update(float deltaTime, rdrImpl* renderer)
 
     // Draw
     rdrDrawTriangles(renderer, objects[1].vertices.data(), (int)objects[1].vertices.size());
-    
-    time += deltaTime;
 }
 
 void scnImpl::showImGuiControls()

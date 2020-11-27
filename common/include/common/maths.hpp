@@ -4,7 +4,7 @@
 
 #include "types.hpp"
 
-#include <iostream>
+#include <string>
 
 // Constant and common maths functions
 namespace maths
@@ -43,17 +43,87 @@ namespace mat4
     mat4x4 frustum(float left, float right, float bottom, float top, float near, float far);
 }
 
-inline float4 operator*(float scale, float4 v)
+inline float2 operator*(const float2& v, float a)
 {
-    return { v.x * scale, v.y * scale , v.z * scale , v.w * scale };
+    return { v.x * a, v.y * a };
 }
 
-inline float4 operator+(float4 v1, float4 v2)
+inline float2 operator*(float a, const float2& v)
+{
+    return { v * a };
+}
+
+inline float2 operator+(const float2& v1, const float2& v2)
+{
+    return { v1.x + v2.x, v1.y + v2.y };
+}
+
+inline float2 operator-(const float2& f)
+{
+    return { -f.x, -f.y };
+}
+
+inline float2 operator-(const float2& v1, const float2& v2)
+{
+    return { v1.x + -v2.x, v1.y + -v2.y };
+}
+
+inline float2 operator/(const float2& v, float a)
+{
+    return { v.x / a, v.y / a };
+}
+
+inline float4 operator+(const float4& v1, const float4& v2)
 {
     return { v1.x + v2.x, v1.y + v2.y , v1.z + v2.z ,v1.w + v2.w };
 }
 
-inline float4 operator*(const mat4x4& m, float4 v)
+inline float4 operator+=(float4& v1, const float4& v2)
+{
+    return v1 = v1 + v2;
+}
+
+inline float4 operator-(const float4& v)
+{
+    return { -v.x, -v.y, -v.z, -v.w };
+}
+
+inline float4 operator-(const float4& v1, const float4& v2)
+{
+    return { v1.x + -v2.x, v1.y + -v2.y, v1.z + -v2.z, v1.w + -v2.w };
+}
+
+inline float4 operator*(const float4& v, float scale)
+{
+    return { v.x * scale, v.y * scale, v.z * scale, v.w * scale };
+}
+
+inline float4 operator*(float scale, const float4& v)
+{
+    return { v.x * scale, v.y * scale , v.z * scale , v.w * scale };
+}
+
+inline float4 operator/(const float4& v, float scale)
+{
+    return { v.x / scale, v.y / scale, v.z / scale, v.w / scale };
+}
+
+inline float4 operator/(float scale, const float4& v)
+{
+    return { v.x / scale, v.y /scale , v.z /scale , v.w / scale };
+}
+
+inline float4 operator*(const float4& v1, const float4& v2)
+{
+    return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v1.w * v2.w };
+}
+
+inline float4 operator*=(float4& v1, const float4& v2)
+{
+    return v1 = v1 * v2;
+}
+
+inline float4 operator*(const mat4x4& m, const float4& v)
 {
     float4 result;
 
@@ -88,42 +158,95 @@ inline mat4x4 operator*(const mat4x4& a, const mat4x4& b)
     return result;
 }
 
-inline float3 operator*(float3 v, float a)
+inline float3 operator*(const float3& v, float a)
 {
     return { v.x * a, v.y * a, v.z * a };
 }
 
-inline float3 operator*(float a, float3 v)
+inline float3 operator*(float a, const float3& v)
 {
     return { v * a };
 }
 
-inline float3 operator+(float3 v1, float3 v2)
+inline float3 operator*(const float3& v1, const float3& v2)
 {
-    return { v1.x + v1.x, v1.y + v1.y, v1.z + v1.z };
+    return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
 }
 
-inline float4 operator*(float4 v, float a)
+inline float3 operator+(const float3& v1, const float3& v2)
 {
-    return { v.x * a, v.y * a, v.z * a, v.w * a };
+    return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
 }
 
-inline float3 operator/(float3 v, float a)
+inline float3 operator-(const float3& f)
+{
+    return { -f.x, -f.y, -f.z };
+}
+
+inline float3 operator-(const float3& v1, const float3& v2)
+{
+    return { v1.x + -v2.x, v1.y + -v2.y, v1.z + -v2.z };
+}
+
+inline float3 operator/(const float3& v, float a)
 {
     return { v.x / a, v.y / a, v.z / a };
 }
 
-inline float4 operator*(float4 v1, float4 v2)
+inline float3 operator^(const float3& v1, const float3& v2)
 {
-    return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v1.w * v2.w };
+    return {
+        v1.y * v2.z - v1.z * v2.y,
+        v1.z * v2.x - v1.x * v2.z,
+        v1.x * v2.y - v1.y * v2.x
+    };
 }
 
 float3 getSphericalCoords(float r, float theta, float phi);
 
-float min(float value1, float value2);
+inline float magnitude(const float3& v)
+{
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
 
-float max(float value1, float value2);
+inline float magnitude(const float4& v)
+{
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+}
 
-float saturate(float value);
+inline float3 normalized(const float3& v)
+{
+    float magn = magnitude(v);
+    return magn == 0 ? v : v / magn;
+}
 
-float dot(float3 v1, float3 v2);
+inline float4 normalized(const float4& v)
+{
+    float magn = magnitude(v);
+    return magn == 0 ? v : v / magn;
+}
+
+inline float remap(float value, float oldMin, float oldMax, float newMin, float newMax)
+{
+    return (value - oldMin) * (newMax - newMin) / (newMin - oldMin) + newMin;
+}
+
+inline float min(float value1, float value2)
+{
+    return value1 <= value2 ? value1 : value2;
+}
+
+inline float max(float value1, float value2)
+{
+    return value1 <= value2 ? value2 : value1;
+}
+
+inline float saturate(float value)
+{
+    return min(max(value, 0.f), 1.f);
+}
+
+inline float dot(const float3& v1, const float3& v2)
+{
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
