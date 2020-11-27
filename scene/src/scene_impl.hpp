@@ -4,8 +4,6 @@
 #include <rdr/renderer.h>
 #include <scn/scene.h>
 
-struct rdrImpl;
-
 struct Object
 {
     std::vector<rdrVertex> vertices;
