@@ -11,8 +11,6 @@
 
 #include <iostream>
 
-#define PIXELLIGHT 0
-
 rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height)
 {
     rdrImpl* renderer = new rdrImpl();
@@ -78,6 +76,7 @@ void rdrSetTexture(rdrImpl* renderer, float* colors32Bits, int width, int height
 {
     renderer->uniform.texture =
     {
+        "",
         width,
         height,
         colors32Bits
@@ -135,27 +134,47 @@ float getWeight(const float2& a, const float2& b, const float2& c)
     return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
 
-float4 getLightColor(const Uniform& uniform)
+float4 getLightColor(const Uniform& uniform, const Varying& varying)
 {
-    float4 lightColor = {0.f, 0.f, 0.f, 0.f};
+    float4 lightSum(0.f, 0.f, 0.f, 0.f);
     for (int i = 0; i < IM_ARRAYSIZE(uniform.lights); i++)
     {
         if (uniform.lights[i].isEnable)
-            lightColor += uniform.lights[i].lightColor * uniform.lights[i].lightPower;
+        {
+            float3 normal = normalized(varying.normal);
+            float3 lightDir = normalized(uniform.lights[i].lightPos.w * varying.coords - uniform.lights[i].lightPos.xyz);
+
+            float dotProd = dot(lightDir, normal);
+
+            float3 R = normalized(2.f * dotProd * normal - lightDir);
+            float3 V = normalized((uniform.view * float4(0.f, 0.f, 0.f, 1.f)).xyz - varying.coords);
+
+            // Diffuse
+            lightSum += saturate(dotProd) * uniform.lights[i].diffuse * uniform.lights[i].lightPower;
+
+            // Specular
+            lightSum += powf(dot(R, V), uniform.shiness) * uniform.lights[i].specular;
+
+            /*float intensity = saturate(-dot(varying.normal, normalized(uniform.lights[i].lightPos.w * varying.coords - uniform.lights[i].lightPos.xyz)));
+            result += color *
+                uniform.lights[i].diffuse *
+                uniform.lights[i].lightPower *
+                intensity;*/
+        }
     }
 
-    return lightColor;
+    return uniform.ambient + lightSum;
 }
 
 float4 fragmentShader(const Varying& fragVars, const Uniform& uniform)
 {
-#if PIXELLIGHT
     if (!uniform.texture.data)
-        return fragVars.light * fragVars.color * getLightColor(uniform);
-#else
-    if (!uniform.texture.data)
-        return fragVars.light * fragVars.color;
-#endif
+    {
+        if (uniform.lightPerPixel)
+            return fragVars.color * getLightColor(uniform, fragVars);
+
+        return fragVars.color;
+    }
 
     const Texture& texture = uniform.texture;
 
@@ -171,12 +190,10 @@ float4 fragmentShader(const Varying& fragVars, const Uniform& uniform)
         texture.data[index + 3]
     };
 
-#if PIXELLIGHT
-    return (texColor * fragVars.color) * fragVars.light * getLightColor(uniform);
-#else
-    return (texColor * fragVars.color);
-#endif
+    if (uniform.lightPerPixel)
+        return texColor * fragVars.color * getLightColor(uniform, fragVars);
 
+    return (texColor * fragVars.color);
 }
 
 float interpolateFloat(const float3& value, const float3& weight)
@@ -230,9 +247,7 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
             weight0 /= triangleArea;
             weight1 /= triangleArea;
 
-            float weight2 = 1.f - weight0 - weight1;
-
-            float3 weight(weight0, weight1, weight2);
+            float3 weight(weight0, weight1, 1.f - weight0 - weight1);
 
             // Depth test / z-buffer
             float z = interpolateFloat(float3(screenCoords[0].z, screenCoords[1].z, screenCoords[2].z), weight);
@@ -246,8 +261,7 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
 
             float3 wVector(screenCoords[0].w, screenCoords[1].w, screenCoords[2].w);
 
-            float interpolatedW = 1.f / interpolateFloat(wVector, weight);
-            float3 correctedWeight = wVector * weight * interpolatedW;
+            float3 correctedWeight = wVector * weight / interpolateFloat(wVector, weight);
 
             Varying fragVarying = interpolateVarying(varying, correctedWeight);
             
@@ -261,33 +275,21 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
 float4 vertexShader(const rdrVertex& vertex, const Uniform& uniform, Varying& varying)
 {
     // Store triangle vertices positions
-    float3 localCoords(vertex.x, vertex.y, vertex.z);
+    varying.coords = { vertex.x, vertex.y, vertex.z };
 
     varying.normal = (uniform.model * float4{ vertex.nx, vertex.ny, vertex.nz, 0.f }).xyz;
 
-    varying.light = saturate(-dot(varying.normal, normalized(localCoords - uniform.lights[0].lightPos)));
-
-#if !PIXELLIGHT
-    varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a) * getLightColor(uniform);
-
-    /*varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a);
-    for (int i = 0; i < IM_ARRAYSIZE(uniform.lights); i++)
-    {
-        if (uniform.lights[i].isEnable)
-            varying.color *= uniform.lights[i].lightColor *
-                             uniform.lights[i].lightPower *
-                             saturate(-dot(varying.normal, normalized(localCoords - uniform.lights[i].lightPos)));
-    }*/
-#else
-    varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a);
-#endif
+    if (!uniform.lightPerPixel)
+        varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a) * getLightColor(uniform, varying);
+    else
+        varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a);
 
     varying.uv = { vertex.u, vertex.v };
 
-    return uniform.mvp * float4{ localCoords, 1.f };
+    return uniform.mvp * float4{ varying.coords, 1.f };
 }
 
-void drawTriangle(rdrImpl* renderer, const Uniform& uniform, rdrVertex* vertices)
+void drawTriangle(rdrImpl* renderer, const Uniform& uniform, const rdrVertex* vertices)
 {
     Varying varying[3];
 
@@ -332,7 +334,7 @@ void drawTriangle(rdrImpl* renderer, const Uniform& uniform, rdrVertex* vertices
         rasterTriangle(renderer->fb, screenCoords, varying, uniform);
 }
 
-void rdrDrawTriangles(rdrImpl* renderer, rdrVertex* vertices, int count)
+void rdrDrawTriangles(rdrImpl* renderer, const rdrVertex* vertices, int count)
 {
     renderer->uniform.mvp = renderer->uniform.projection * renderer->uniform.view * renderer->uniform.model;
 
@@ -350,6 +352,7 @@ void rdrShowImGuiControls(rdrImpl* renderer)
 {
     ImGui::Checkbox("wireframe", &renderer->uniform.wireframeMode);
     ImGui::Checkbox("depthtest", &renderer->uniform.depthTest);
+    ImGui::Checkbox("light per pixel", &renderer->uniform.lightPerPixel);
     ImGui::Checkbox("backFaceCulling", &renderer->uniform.backFaceCulling);
     ImGui::ColorEdit4("lineColor", renderer->lineColor.e);
 }

@@ -178,6 +178,8 @@ int main(int argc, char* argv[])
             inputs.moveDownward = ImGui::IsKeyDown(GLFW_KEY_LEFT_SHIFT);
             inputs.moveLeft = ImGui::IsKeyDown(GLFW_KEY_A);
             inputs.moveRight = ImGui::IsKeyDown(GLFW_KEY_D);
+            inputs.speedUp = ImGui::IsKeyDown(GLFW_KEY_KP_ADD);
+            inputs.speedDown = ImGui::IsKeyDown(GLFW_KEY_KP_SUBTRACT);
             camera.update(ImGui::GetIO().DeltaTime, inputs);
         }
 

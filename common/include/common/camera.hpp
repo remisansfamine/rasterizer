@@ -12,6 +12,8 @@ struct CameraInputs
     bool moveRight;
     bool moveUpward;
     bool moveDownward;
+    bool speedUp;
+    bool speedDown;
     // ... and more if needed
 };
 
@@ -30,6 +32,8 @@ struct Camera
     float fovY = 60.f;
     float yaw = 0.f;
     float pitch = 0.f;
+
+    float speed = 0.3f;
 
     void showImGuiControls();
 };

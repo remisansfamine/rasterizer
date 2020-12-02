@@ -9,6 +9,9 @@ struct Uniform
     float time;
     float deltaTime;
 
+    float4 ambient = {0.2f, 0.2f, 0.2f, 1.f};
+    float shiness = 20.f;
+
     Light lights[8];
 
     Texture texture;
@@ -21,11 +24,12 @@ struct Uniform
     bool depthTest = true;
     bool wireframeMode = false;
     bool backFaceCulling = true;
+    bool lightPerPixel = false;
 };
 
 struct Varying
 {
-    float light;
+    float3 coords;
     float3 normal;
     float4 color;
     float2 uv;

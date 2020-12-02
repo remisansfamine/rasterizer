@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 union float2
 {
     float2() = default;
@@ -19,7 +21,7 @@ union float3
         : x(x), y(y), z(z)
     {}
 
-    float3(float2 xy, float z)
+    float3(float2 xy, float z = 0.f)
         : x(xy.x), y(xy.y), z(z)
     {}
 
@@ -36,7 +38,7 @@ union float4
         : x(x), y(y), z(z), w(w)
     {}
 
-    float4 (float3 xyz, float w)
+    float4 (float3 xyz, float w = 0.f)
         : x(xyz.x), y(xyz.y), z(xyz.z), w(w)
     {}
 
@@ -56,14 +58,17 @@ union mat4x4
 
 struct Texture
 {
-    int width, height;
+    std::string fileName;
+    int width = 0, height = 0;
     float* data = nullptr;
 };
 
 struct Light
 {
-    float3  lightPos;
-    float4  lightColor;
-    bool    isEnable;
-    float   lightPower;
+    bool    isEnable = false;
+    float4  lightPos = { 0.f, 0.f, 0.f, 0.f };
+    float4  diffuse  = { 0.f, 0.f, 0.f, 0.f };
+    float4  ambient  = { 0.f, 0.f, 0.f, 0.f };
+    float4  specular = { 0.f, 0.f, 0.f, 0.f };
+    float   lightPower = 1.f;
 };
