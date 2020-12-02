@@ -25,9 +25,11 @@ typedef struct rdrVertex
 
 typedef struct rdrLight
 {
+    bool  enabled;
     float x, y, z, w;
-    float r, g, b, a;
-    bool enabled;
+    float dr, dg, db, da;
+    float ar, ag, ab, aa;
+    float sr, sg, sb, sa;
     float power;
 } rdrLight;
 
@@ -60,7 +62,7 @@ RDR_API void rdrSetViewport(rdrImpl* renderer, int x, int y, int width, int heig
 RDR_API void rdrSetTexture(rdrImpl* renderer, float* colors32Bits, int width, int height);
 
 // Draw a list of triangles
-RDR_API void rdrDrawTriangles(rdrImpl* renderer, rdrVertex* vertices, int vertexCount);
+RDR_API void rdrDrawTriangles(rdrImpl* renderer, const rdrVertex* vertices, int vertexCount);
 
 struct ImGuiContext;
 RDR_API void rdrSetImGuiContext(rdrImpl* renderer, struct ImGuiContext* context);

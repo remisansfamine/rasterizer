@@ -4,10 +4,16 @@
 #include <rdr/renderer.h>
 #include <scn/scene.h>
 
-struct Object
+struct Face
 {
     std::vector<rdrVertex> vertices;
-    mat4x4 model;
+    Texture* texture = nullptr;
+};
+
+struct Object
+{
+    std::vector<Face> faces;
+    mat4x4 model = mat4::identity();
 };
 
 struct scnImpl
@@ -18,10 +24,13 @@ struct scnImpl
 
     void showImGuiControls();
 
-private:
-    double time = 0.0;
     std::vector<Object> objects;
-    float scale = 1.f;
-
     std::vector<Texture> textures;
+    Light lights[8];
+
+    private:
+        void drawObject(Object object, rdrImpl* renderer);
+
+        double time = 0.0;
+        float scale = 1.f;
 };

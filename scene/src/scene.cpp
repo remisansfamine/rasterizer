@@ -14,8 +14,23 @@
 #include "common\maths.hpp"
 
 #include <iostream>
+#include <algorithm>
 
-bool loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::string mtlBasedir, float scale = 1.f)
+Texture* loadTexture(scnImpl* scene, const char* filePath)
+{
+    Texture texture;
+    texture.fileName = filePath;
+    texture.data = stbi_loadf(filePath, &texture.width, &texture.height, nullptr, STBI_rgb_alpha);
+
+    if (!texture.data)
+        return nullptr;
+
+    scene->textures.push_back(texture);
+
+    return &scene->textures.back();
+}
+
+bool loadObject(std::vector<Face>& faces, scnImpl* scene, std::string filePath, std::string mtlBasedir, float scale = 1.f)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -46,6 +61,8 @@ bool loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::str
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
         {
             int fv = shapes[s].mesh.num_face_vertices[f];
+
+            Face face;
 
             // Loop over vertices in the face.
             for (size_t v = 0; v < fv; v++)
@@ -78,35 +95,58 @@ bool loadObject(std::vector<rdrVertex>& vertices, std::string filePath, std::str
                     vertice.v = attrib.texcoords[2 * idx.texcoord_index + 1];
                 }
 
-                vertices.push_back(vertice);
+                face.vertices.push_back(vertice);
             }
+
             index_offset += fv;
 
-            shapes[s].mesh.material_ids[f];
+            tinyobj::material_t& mat = materials[shapes[s].mesh.material_ids[f]];
+
+            std::string text_filepath = mtlBasedir + mat.diffuse_texname;
+
+            if (std::find_if(scene->textures.begin(), scene->textures.end(),
+                [text_filepath](Texture& t) { return t.fileName.compare(text_filepath) == 0; }) == scene->textures.end())
+                face.texture = loadTexture(scene, (text_filepath).c_str());
+
+            //else
+            //    face.texture = &(*tex_it);
+
+            faces.push_back(face);
         }
     }
 
     return 1;
 }
 
-void loadQuad(std::vector<rdrVertex>& vertices)
+void loadQuad(std::vector<Face>& faces)
 {
-    //                          pos                   normal                    color                  uv
-    vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
-    vertices.push_back({  0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     1.0f, 0.0f });
-    vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
+    Face face1;
 
-    vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
-    vertices.push_back({ -0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
-    vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+    //                          pos                   normal                    color                  uv
+    face1.vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+    face1.vertices.push_back({  0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     1.0f, 0.0f });
+    face1.vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
+
+    faces.push_back(face1);
+    Face face2;
+
+    face2.vertices.push_back({  0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     1.0f, 1.0f });
+    face2.vertices.push_back({ -0.5f,  0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
+    face2.vertices.push_back({ -0.5f, -0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+
+    faces.push_back(face2);
 }
 
-void loadTriangle(std::vector<rdrVertex>& vertices)
+void loadTriangle(std::vector<Face>& faces)
 {
+    Face face;
+
     //                          pos                   normal                  color                     uv
-    vertices.push_back({-0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
-    vertices.push_back({ 0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     0.5f, 0.5f });
-    vertices.push_back({ 0.0f,  0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
+    face.vertices.push_back({-0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
+    face.vertices.push_back({ 0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     0.5f, 0.5f });
+    face.vertices.push_back({ 0.0f,  0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
+
+    faces.push_back(face);
 }
 
 scnImpl* scnCreate()
@@ -140,23 +180,42 @@ scnImpl::scnImpl()
 
     // HERE: Load the scene
     // Setup some vertices to test
-    Texture texture1;
-    texture1.data = stbi_loadf("assets/danny.jpeg", &texture1.width, &texture1.height, nullptr, STBI_rgb_alpha);
-
-    Texture texture2;
-    texture2.data = stbi_loadf("assets/Deathclaw.png", &texture2.width, &texture2.height, nullptr, STBI_rgb_alpha);
-
-    textures.push_back(texture1);
-    textures.push_back(texture2);
+    loadTexture(this, "assets/danny.jpeg");
+    //loadTexture(this, "assets/Deathclaw.png");
 
     Object obj1;
-    loadQuad(obj1.vertices);
+    loadQuad(obj1.faces);
     objects.push_back(obj1);
 
     Object obj2;
-    if (loadObject(obj2.vertices, "assets/car.obj", "assets", 0.005f))
+    loadTriangle(obj2.faces);
+    //if (loadObject(obj2.vertices, "assets/sphere.obj", "assets", 0.5f))
         objects.push_back(obj2);
     
+    Object obj3;
+        loadObject(obj3.faces, this, "assets/deathclaw.obj", "assets/");
+        objects.push_back(obj3);
+
+    lights[0].isEnable = true;
+    lights[0].lightPos.w = 0.f;
+    lights[0].lightPos.xyz = {0.f, -1.f, 0.f};
+    lights[0].ambient = { 0.f, 0.f, 0.f, 1.f };
+    lights[0].diffuse = { 0.f, 0.f, 0.f, 1.f };
+    lights[0].specular = { 1.f, 0.f, 0.f, 1.f };
+    
+    lights[1].isEnable = true;
+    lights[1].lightPos.w = 0.f;
+    lights[1].lightPos.xyz = { 0.f, 0.f, -1.f };
+    lights[1].ambient = { 0.f, 0.f, 0.f, 1.f };
+    lights[1].diffuse =  { 0.f, 0.f, 0.f, 1.f };
+    lights[1].specular = { 1.f, 1.f, 1.f, 1.f };
+
+    lights[2].isEnable = true;
+    lights[2].lightPos.w = 0.f;
+    lights[2].lightPos.xyz = { 0.f, 1.f, 0.f };
+    lights[2].diffuse = { 0.f, 0.f, 0.f, 1.f };
+    lights[2].ambient =  { 1.f, 0.f, 0.f, 1.f };
+    lights[2].specular = { 1.f, 1.f, 0.f, 1.f };
 }
 
 scnImpl::~scnImpl()
@@ -166,50 +225,57 @@ scnImpl::~scnImpl()
     // HERE: Unload the scene
 }
 
+void scnImpl::drawObject(Object object, rdrImpl* renderer)
+{
+    for (const Face& face : object.faces)
+    {
+        if (face.texture && face.texture->data && face.texture->height > 0 && face.texture->width > 0)
+            rdrSetTexture(renderer, face.texture->data, face.texture->width, face.texture->height);
+
+        rdrDrawTriangles(renderer, face.vertices.data(), (int)face.vertices.size());
+    }
+}
+
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
-    Light light =
-    {
-        {0.f, (sin((float)time) + 1.f) * 0.5f, 0.f},
-        {1.f, 0.f, 0.f, 1.f},
-        true,
-        1.f
-    };
-
-    Light light2 =
-    {
-        {0.f, (1.f - sin((float)time)) * 0.5f, 0.f},
-        {0.f, 1.f, 1.f, 1.f},
-        true,
-        1.f
-    };
-
-    rdrSetUniformLight(renderer, 0, (rdrLight*)&light);
-    rdrSetUniformLight(renderer, 1, (rdrLight*)&light2);
 
     rdrSetUniformFloatV(renderer, rdrUniformType::UT_TIME, (float*)&time);
     time += deltaTime;
 
-    // HERE: Update (if needed) and display the scene
+    rdrSetUniformLight(renderer, 0, (rdrLight*)&lights[0]);
+    //rdrSetUniformLight(renderer, 1, (rdrLight*)&lights[1]);
+    //rdrSetUniformLight(renderer, 2, (rdrLight*)&lights[2]);
+    
     rdrSetTexture(renderer, textures[0].data, textures[0].width, textures[0].height);
 
-    objects[0].model = mat4::translate({ 0.f, 0.f, -3.f }) * mat4::rotateY(time);
+    objects[0].model = mat4::translate({ 0.f, 0.f, -3.f });// *mat4::rotateY(time);
     rdrSetModel(renderer, objects[0].model.e);
 
     // Draw
-    rdrDrawTriangles(renderer, objects[0].vertices.data(), (int)objects[0].vertices.size());
+
+    // Draw
+    drawObject(objects[0], renderer);
 
     if (objects.size() <= 1)
         return;
 
-    rdrSetTexture(renderer, textures[1].data, textures[1].width, textures[1].height);
+    rdrSetTexture(renderer, nullptr, textures[1].width, textures[1].height);
 
-    objects[1].model = mat4::identity();
+    objects[1].model = mat4::translate({ 2.f, -1.f, 0.f }) * mat4::rotateX(-M_PI * 0.5f) * mat4::scale({2.f, 2.f, 2.f});
 
     rdrSetModel(renderer, objects[1].model.e);
 
     // Draw
-    rdrDrawTriangles(renderer, objects[1].vertices.data(), (int)objects[1].vertices.size());
+    drawObject(objects[1], renderer);
+
+    if (objects.size() <= 2)
+        return;
+
+    objects[2].model = mat4::translate({ -2.f, 0.f, 0.f });
+
+    rdrSetModel(renderer, objects[2].model.e);
+
+    drawObject(objects[2], renderer);
 }
 
 void scnImpl::showImGuiControls()
