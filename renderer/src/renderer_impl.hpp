@@ -25,6 +25,7 @@ struct Uniform
     bool wireframeMode = false;
     bool backFaceCulling = true;
     bool lightPerPixel = false;
+    bool perspectiveCorrection = true;
 };
 
 struct Varying

@@ -80,7 +80,8 @@ inline float4 operator+(const float4& v1, const float4& v2)
 
 inline float4 operator+=(float4& v1, const float4& v2)
 {
-    return v1 = v1 + v2;
+    v1 = v1 + v2;
+    return v1;
 }
 
 inline float4 operator-(const float4& v)
@@ -118,9 +119,10 @@ inline float4 operator*(const float4& v1, const float4& v2)
     return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z, v1.w * v2.w };
 }
 
-inline float4 operator*=(float4& v1, const float4& v2)
+inline float4& operator*=(float4& v1, const float4& v2)
 {
-    return v1 = v1 * v2;
+    v1 = v1 * v2;
+    return v1;
 }
 
 inline float4 operator*(const mat4x4& m, const float4& v)
@@ -171,6 +173,12 @@ inline float3 operator*(float a, const float3& v)
 inline float3 operator*(const float3& v1, const float3& v2)
 {
     return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
+}
+
+inline float3& operator*=(float3& v1, const float3& v2)
+{
+    v1 = v1 * v2;
+    return v1;
 }
 
 inline float3 operator+(const float3& v1, const float3& v2)
