@@ -198,7 +198,7 @@ float4 fragmentShader(const Varying& fragVars, const Uniform& uniform)
 
 float interpolateFloat(const float3& value, const float3& weight)
 {
-    return value.e[0] * weight.e[0] + value.e[1] * weight.e[1] + value.e[2] * weight.e[2];
+    return dot(value, weight);
 }
 
 Varying interpolateVarying(const Varying* varyings, const float3& weight)
@@ -224,7 +224,7 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
     int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
     int yMax = max(screenCoords[0].y, max(screenCoords[1].y, screenCoords[2].y));
 
-    float triangleArea = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
+    float inversedArea = 1.f / getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
 
     for (int i = xMin; i <= xMax; i++)
     {
@@ -233,37 +233,40 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
             // Check if the pixel is in the triangle foreach segment
             float2 pixel(i + 0.5f, j + 0.5f);
             
-            float weight0 = getWeight(screenCoords[1].xy, screenCoords[2].xy, pixel);
+            float weight0 = getWeight(screenCoords[1].xy, screenCoords[2].xy, pixel) * inversedArea;
             if (weight0 < 0.f)
                 continue;
             
-            float weight1 = getWeight(screenCoords[2].xy, screenCoords[0].xy, pixel);
+            float weight1 = getWeight(screenCoords[2].xy, screenCoords[0].xy, pixel) * inversedArea;
             if (weight1 < 0.f)
                 continue;
 
-            if (triangleArea - weight0 - weight1 < 0.f)
+            float weight2 = 1.f - weight0 - weight1;
+            if (weight2 < 0.f)
                 continue;
 
-            weight0 /= triangleArea;
-            weight1 /= triangleArea;
-
-            float3 weight(weight0, weight1, 1.f - weight0 - weight1);
+            float3 weight(weight0, weight1, weight2);
 
             // Depth test / z-buffer
-            float z = interpolateFloat(float3(screenCoords[0].z, screenCoords[1].z, screenCoords[2].z), weight);
+            if (uniform.depthTest)
             {
+                float  z = interpolateFloat(float3(screenCoords[0].z, screenCoords[1].z, screenCoords[2].z), weight);
                 float* zBuffer = &fb.depthBuffer[j * fb.width + i];
-                if (*zBuffer >= z && uniform.depthTest)
+
+                if (*zBuffer >= z)
                     continue;
 
                 *zBuffer = z;
             }
 
-            float3 wVector(screenCoords[0].w, screenCoords[1].w, screenCoords[2].w);
+            // Perspective correction
+            if (uniform.perspectiveCorrection)
+            {
+                float3 wVector(screenCoords[0].w, screenCoords[1].w, screenCoords[2].w);
+                weight *= wVector / interpolateFloat(wVector, weight);
+            }
 
-            float3 correctedWeight = wVector * weight / interpolateFloat(wVector, weight);
-
-            Varying fragVarying = interpolateVarying(varying, correctedWeight);
+            Varying fragVarying = interpolateVarying(varying, weight);
             
             float4 color = fragmentShader(fragVarying, uniform);
             color.a = 1.f;
@@ -354,5 +357,6 @@ void rdrShowImGuiControls(rdrImpl* renderer)
     ImGui::Checkbox("depthtest", &renderer->uniform.depthTest);
     ImGui::Checkbox("light per pixel", &renderer->uniform.lightPerPixel);
     ImGui::Checkbox("backFaceCulling", &renderer->uniform.backFaceCulling);
+    ImGui::Checkbox("perspectiveCorrection", &renderer->uniform.perspectiveCorrection);
     ImGui::ColorEdit4("lineColor", renderer->lineColor.e);
 }

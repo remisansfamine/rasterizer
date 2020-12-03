@@ -16,7 +16,7 @@
 #include <iostream>
 #include <algorithm>
 
-Texture* loadTexture(scnImpl* scene, const char* filePath)
+Texture* loadTexture(std::vector<Texture>& textures, const char* filePath)
 {
     Texture texture;
     texture.fileName = filePath;
@@ -25,12 +25,12 @@ Texture* loadTexture(scnImpl* scene, const char* filePath)
     if (!texture.data)
         return nullptr;
 
-    scene->textures.push_back(texture);
+    textures.push_back(texture);
 
-    return &scene->textures.back();
+    return &textures.back();
 }
 
-bool loadObject(std::vector<Face>& faces, scnImpl* scene, std::string filePath, std::string mtlBasedir, float scale = 1.f)
+bool loadObject(std::vector<Face>& faces, std::vector<Texture>& textures, std::string filePath, std::string mtlBasedir, float scale = 1.f)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -51,6 +51,19 @@ bool loadObject(std::vector<Face>& faces, scnImpl* scene, std::string filePath, 
 
     if (!ret) {
         return 0;
+    }
+
+    if (!materials.empty())
+    for (size_t m = 0; m < materials.size(); m++)
+    {
+        tinyobj::material_t& mat = materials[m];
+
+        std::string tex_filepath = mtlBasedir + mat.diffuse_texname;
+
+        if (std::find_if(textures.begin(), textures.end(),
+            [tex_filepath](Texture& t)
+            { return t.fileName.compare(tex_filepath) == 0; }) == textures.end())
+            loadTexture(textures, tex_filepath.c_str());
     }
 
     // Loop over shapes
@@ -100,17 +113,19 @@ bool loadObject(std::vector<Face>& faces, scnImpl* scene, std::string filePath, 
 
             index_offset += fv;
 
-            tinyobj::material_t& mat = materials[shapes[s].mesh.material_ids[f]];
+            if (!materials.empty())
+            {
+                tinyobj::material_t& mat = materials[shapes[s].mesh.material_ids[f]];
 
-            std::string text_filepath = mtlBasedir + mat.diffuse_texname;
-
-            if (std::find_if(scene->textures.begin(), scene->textures.end(),
-                [text_filepath](Texture& t) { return t.fileName.compare(text_filepath) == 0; }) == scene->textures.end())
-                face.texture = loadTexture(scene, (text_filepath).c_str());
-
-            //else
-            //    face.texture = &(*tex_it);
-
+                for (Texture& texture : textures)
+                {
+                    if (texture.fileName.compare(mtlBasedir + mat.diffuse_texname) == 0)
+                    {
+                        face.texture = &texture;
+                        break;
+                    }
+                }
+            }
             faces.push_back(face);
         }
     }
@@ -180,7 +195,7 @@ scnImpl::scnImpl()
 
     // HERE: Load the scene
     // Setup some vertices to test
-    loadTexture(this, "assets/danny.jpeg");
+    loadTexture(textures, "assets/danny.jpeg");
     //loadTexture(this, "assets/Deathclaw.png");
 
     Object obj1;
@@ -193,7 +208,7 @@ scnImpl::scnImpl()
         objects.push_back(obj2);
     
     Object obj3;
-        loadObject(obj3.faces, this, "assets/deathclaw.obj", "assets/");
+        loadObject(obj3.faces, textures, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
         objects.push_back(obj3);
 
     lights[0].isEnable = true;
