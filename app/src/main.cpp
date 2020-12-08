@@ -128,6 +128,7 @@ int main(int argc, char* argv[])
     rdrImpl* renderer = rdrInit(
         framebuffer.getColorBuffer(),
         framebuffer.getDepthBuffer(),
+        framebuffer.getStencilBuffer(),
         framebuffer.getWidth(), framebuffer.getHeight());
 
     rdrSetImGuiContext(renderer, ImGui::GetCurrentContext());
@@ -159,6 +160,7 @@ int main(int argc, char* argv[])
             mouseY = newMouseY;
         }
 
+        float time = (float)glfwGetTime();
         float deltaTime = ImGui::GetIO().DeltaTime;
 
         // Update camera
@@ -187,6 +189,10 @@ int main(int argc, char* argv[])
         framebuffer.clear();
 
         // Setup matrices
+        rdrSetUniformFloatV(renderer, UT_CAMERAPOS, camera.position.e);
+        rdrSetUniformFloatV(renderer, UT_DELTATIME, &deltaTime);
+        rdrSetUniformFloatV(renderer, UT_TIME, &time);
+
         mat4x4 projection = camera.getProjection();
         mat4x4 view       = camera.getViewMatrix();
         rdrSetProjection(renderer, projection.e);

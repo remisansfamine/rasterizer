@@ -43,6 +43,11 @@ void Framebuffer::clear()
     {
         memset(depthBuffer.data(), 0, depthBuffer.size() * sizeof(depthBuffer[0]));
     }
+
+    // Clear stencil buffer
+    {
+        memset(stencilBuffer.data(), 0, stencilBuffer.size() * sizeof(stencilBuffer[0]));
+    }
 }
 
 void Framebuffer::updateTexture()

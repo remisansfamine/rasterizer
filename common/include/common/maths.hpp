@@ -6,6 +6,8 @@
 
 #include <string>
 
+#include <algorithm>
+
 // Constant and common maths functions
 namespace maths
 {
@@ -104,14 +106,21 @@ inline float4 operator*(float scale, const float4& v)
     return { v.x * scale, v.y * scale , v.z * scale , v.w * scale };
 }
 
-inline float4 operator/(const float4& v, float scale)
+inline float4& operator*=(float4& v, float scale)
 {
-    return { v.x / scale, v.y / scale, v.z / scale, v.w / scale };
+    v = v * scale;
+    return v;
 }
 
-inline float4 operator/(float scale, const float4& v)
+inline float4 operator/(const float4& v, float scale)
 {
-    return { v.x / scale, v.y /scale , v.z /scale , v.w / scale };
+    return scale == 0.f ? v : float4{ v.x / scale, v.y / scale, v.z / scale, v.w / scale };
+}
+
+inline float4& operator/(float4& v, float scale)
+{
+    v = v / scale;
+    return v;
 }
 
 inline float4 operator*(const float4& v1, const float4& v2)
@@ -170,6 +179,12 @@ inline float3 operator*(float a, const float3& v)
     return { v * a };
 }
 
+inline float3& operator*=(float3& v, float a)
+{
+    v = v * a;
+    return v;
+}
+
 inline float3 operator*(const float3& v1, const float3& v2)
 {
     return { v1.x * v2.x, v1.y * v2.y, v1.z * v2.z };
@@ -196,9 +211,31 @@ inline float3 operator-(const float3& v1, const float3& v2)
     return { v1.x + -v2.x, v1.y + -v2.y, v1.z + -v2.z };
 }
 
-inline float3 operator/(const float3& v, float a)
+inline float3 operator/(const float3& v, float scale)
 {
-    return { v.x / a, v.y / a, v.z / a };
+    return scale == 0.f ? v : float3{ v.x / scale, v.y / scale, v.z / scale };
+}
+
+inline float3 operator/(float scale, const float3& v)
+{
+    return v.x || v.y || v.y == 0.f ? v : float3{ scale / v.x, scale / v.y, scale / v.z };
+}
+
+inline float3 operator/(float3& v1, const float3& v2)
+{
+    return v2.x || v2.y || v2.y == 0.f ? v1 : float3{ v1.x / v2.x, v1.x / v2.y, v1.x / v2.z };
+}
+
+inline float3& operator/=(float3& v, float a)
+{
+    v = v / a;
+    return v;
+}
+
+inline float3& operator/=(float3& v1, const float3& v2)
+{
+    v1 = v1 / v2;
+    return v1;
 }
 
 inline float3 operator^(const float3& v1, const float3& v2)
@@ -214,24 +251,24 @@ float3 getSphericalCoords(float r, float theta, float phi);
 
 inline float magnitude(const float3& v)
 {
-    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
 inline float magnitude(const float4& v)
 {
-    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
 }
 
 inline float3 normalized(const float3& v)
 {
     float magn = magnitude(v);
-    return magn == 0 ? v : v / magn;
+    return v / magn;
 }
 
 inline float4 normalized(const float4& v)
 {
     float magn = magnitude(v);
-    return magn == 0 ? v : v / magn;
+    return v / magn;
 }
 
 inline float remap(float value, float oldMin, float oldMax, float newMin, float newMax)
@@ -239,22 +276,30 @@ inline float remap(float value, float oldMin, float oldMax, float newMin, float 
     return (value - oldMin) * (newMax - newMin) / (newMin - oldMin) + newMin;
 }
 
-inline float min(float value1, float value2)
-{
-    return value1 <= value2 ? value1 : value2;
-}
-
-inline float max(float value1, float value2)
-{
-    return value1 <= value2 ? value2 : value1;
-}
-
 inline float saturate(float value)
 {
-    return min(max(value, 0.f), 1.f);
+    return std::clamp(value, 0.f, 1.f);
 }
 
 inline float dot(const float3& v1, const float3& v2)
 {
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
+
+inline float mod(float value, float dividend)
+{
+    float result = fmod(value, dividend);
+    return (result < 0) ? result + dividend : result;
+}
+
+template<typename T>
+inline T lerp(T value0, T value1, float t)
+{
+    return (1 - t) * value0 + t * value1;
+}
+
+template<typename T>
+inline T bilinear(const float& s, const float& t, const T values[4])
+{
+    return lerp(lerp(values[0], values[1], s), lerp(values[2], values[3], s), t);
 }

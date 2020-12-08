@@ -52,7 +52,7 @@ union float4
 
 union mat4x4
 {
-    float e[16];
+    float  e[16];
     float4 c[4];
 };
 
@@ -60,15 +60,17 @@ struct Texture
 {
     std::string fileName;
     int width = 0, height = 0;
-    float* data = nullptr;
+    float4* data = nullptr;
 };
 
 struct Light
 {
     bool    isEnable = false;
-    float4  lightPos = { 0.f, 0.f, 0.f, 0.f };
-    float4  diffuse  = { 0.f, 0.f, 0.f, 0.f };
-    float4  ambient  = { 0.f, 0.f, 0.f, 0.f };
+    float4  lightPos = { 0.f, 0.f, 0.f, 1.f };
+    float4  ambient = { 0.f, 0.f, 0.f, 0.f };
+    float4  diffuse  = { 1.f, 1.f, 1.f, 1.f };
     float4  specular = { 0.f, 0.f, 0.f, 0.f };
-    float   lightPower = 1.f;
+    float   constantAttenuation = 1.f;
+    float   linearAttenuation = 0.f;
+    float   quadraticAttenuation = 0.f;
 };
