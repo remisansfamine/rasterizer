@@ -87,6 +87,8 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../renderer/include;../scene/include/;../common/include;../third_party/include</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>26451</DisableSpecificWarnings>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -105,6 +107,8 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>../renderer/include;../scene/include/;../common/include;../third_party/include</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>26451</DisableSpecificWarnings>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

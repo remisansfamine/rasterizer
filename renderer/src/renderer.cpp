@@ -9,14 +9,17 @@
 
 #include "renderer_impl.hpp"
 
-#include <iostream>
+#include <algorithm>
 
-rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height)
+#include <cmath>
+
+rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int* stencilBuffer, int width, int height)
 {
     rdrImpl* renderer = new rdrImpl();
 
     renderer->fb.colorBuffer = reinterpret_cast<float4*>(colorBuffer32Bits);
     renderer->fb.depthBuffer = depthBuffer;
+    renderer->fb.stencilBuffer = stencilBuffer;
     renderer->fb.width = width;
     renderer->fb.height = height;
 
@@ -34,11 +37,25 @@ void rdrSetUniformFloatV(rdrImpl* renderer, rdrUniformType type, float* value)
 {
     switch (type)
     {
-        case UT_TIME:      renderer->uniform.time = value[0]; break;
-        case UT_DELTATIME: renderer->uniform.deltaTime = value[0]; break;
-        default:;
+    case UT_TIME:      renderer->uniform.time = value[0]; break;
+    case UT_DELTATIME: renderer->uniform.deltaTime = value[0]; break;
+    case UT_CAMERAPOS: renderer->uniform.cameraPos = float3{ value[0], value[1], value[2] }; break;
+    case UT_GLOBALAMBIENT:  renderer->uniform.globalAmbient = float4{ value[0], value[1], value[2], value[3] }; break;
+    case UT_GLOBALCOLOR:    renderer->uniform.globalColor = float4{ value[0], value[1], value[2], value[3] }; break;
+    default:;
     }
 }
+
+void rdrSetUniformBool(rdrImpl* renderer, rdrUniformType type, bool value)
+{
+    switch (type)
+    {
+    case UT_DEPTHTEST:      renderer->uniform.depthTest = value; break;
+    case UT_STENCTILTEST:   renderer->uniform.stencilTest = value; break;
+    default:;
+    }
+}
+
 
 void rdrSetUniformLight(rdrImpl* renderer, int index, rdrLight* light)
 {
@@ -79,7 +96,7 @@ void rdrSetTexture(rdrImpl* renderer, float* colors32Bits, int width, int height
         "",
         width,
         height,
-        colors32Bits
+        (float4*)colors32Bits
     };
 }
 
@@ -123,7 +140,7 @@ float3 ndcToScreenCoords(const float3& ndc, const Viewport& viewport)
 {
     return
     {
-        remap( ndc.x, -1.f, 1.f, viewport.x, viewport.width  * 0.5f),
+        remap(ndc.x, -1.f, 1.f, viewport.x, viewport.width * 0.5f),
         remap(-ndc.y, -1.f, 1.f, viewport.y, viewport.height * 0.5f),
         remap(-ndc.z, -1.f, 1.f, 0.f, 1.f)
     };
@@ -134,66 +151,89 @@ float getWeight(const float2& a, const float2& b, const float2& c)
     return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
 
-float4 getLightColor(const Uniform& uniform, const Varying& varying)
+void getLightColor(const Uniform& uniform, Varying& varying)
 {
-    float4 lightSum(0.f, 0.f, 0.f, 0.f);
     for (int i = 0; i < IM_ARRAYSIZE(uniform.lights); i++)
     {
-        if (uniform.lights[i].isEnable)
-        {
-            float3 normal = normalized(varying.normal);
-            float3 lightDir = normalized(uniform.lights[i].lightPos.w * varying.coords - uniform.lights[i].lightPos.xyz);
+        if (!uniform.lights[i].isEnable)
+            continue;
 
-            float dotProd = dot(lightDir, normal);
+        const Light& currLight = uniform.lights[i];
 
-            float3 R = normalized(2.f * dotProd * normal - lightDir);
-            float3 V = normalized((uniform.view * float4(0.f, 0.f, 0.f, 1.f)).xyz - varying.coords);
+        float3 normal = normalized(varying.normal);
+        float3 lightDir = (currLight.lightPos).xyz / (currLight.lightPos).w - currLight.lightPos.w * varying.coords;
 
-            // Diffuse
-            lightSum += saturate(dotProd) * uniform.lights[i].diffuse * uniform.lights[i].lightPower;
+        float  distance = magnitude(lightDir);
 
-            // Specular
-            lightSum += powf(dot(R, V), uniform.shiness) * uniform.lights[i].specular;
+        lightDir /= distance;
 
-            /*float intensity = saturate(-dot(varying.normal, normalized(uniform.lights[i].lightPos.w * varying.coords - uniform.lights[i].lightPos.xyz)));
-            result += color *
-                uniform.lights[i].diffuse *
-                uniform.lights[i].lightPower *
-                intensity;*/
-        }
+        if (!currLight.lightPos.w)
+            lightDir *= -1.f;
+
+        float NdotL = dot(lightDir, normal);
+
+        float attenuation = currLight.constantAttenuation +
+            currLight.linearAttenuation * distance +
+            currLight.quadraticAttenuation * distance * distance;
+
+        // Ambient
+        varying.ambientColor += currLight.ambient;
+
+        // Diffuse
+        varying.diffuseColor += std::max(0.f, NdotL) * currLight.diffuse / attenuation;
+
+        // Specular
+        float3 R = normalized(2.f * NdotL * normal - lightDir);
+        float3 V = normalized(uniform.cameraPos - varying.coords);
+
+        varying.specularColor += powf(std::max(0.f, dot(R, V)), uniform.shiness) * currLight.specular / attenuation;
     }
 
-    return uniform.ambient + lightSum;
+    varying.diffuseColor.a = varying.specularColor.a = 0.f;
 }
 
-float4 fragmentShader(const Varying& fragVars, const Uniform& uniform)
+float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
 {
-    if (!uniform.texture.data)
-    {
-        if (uniform.lightPerPixel)
-            return fragVars.color * getLightColor(uniform, fragVars);
-
-        return fragVars.color;
-    }
+    if (!uniform.texture.data || uniform.texture.height <= 0 || uniform.texture.width <= 0)
+        return { 1.f, 1.f, 1.f, 1.f };
 
     const Texture& texture = uniform.texture;
 
-    int s = (int(texture.width  * fragVars.uv.u) % texture.width  + texture.width)  % texture.width;
-    int t = (int(texture.height * fragVars.uv.v) % texture.height + texture.height) % texture.height;
+    // Get tex coords with UVs
+    float s = (texture.width - 1.f)  * mod(fragVars.uv.u, 1.f);
+    float t = (texture.height - 1.f) * mod(fragVars.uv.v, 1.f);
 
-    int index = ((texture.width * t) + s) * 4;
-    float4 texColor =
+    int si = int(s), ti = int(t);
+
+    int tindex = ti * texture.width;
+
+    float4 texColor;
+    if (uniform.textureFilter == FilterType::BILINEAR)
     {
-        texture.data[index + 0],
-        texture.data[index + 1],
-        texture.data[index + 2],
-        texture.data[index + 3]
-    };
+        const float4 colors[4] =
+        {
+            texture.data[ti * texture.width + si],
+            texture.data[ti * texture.width + si + 1],
+            texture.data[(ti + 1) * texture.width + si],
+            texture.data[(ti + 1) * texture.width + si + 1],
+        };
+        texColor = bilinear(s - si, t - ti, colors);
+    }
+    else
+        texColor = texture.data[ti * texture.width + si];
+
+    return texColor;
+}
+
+float4 fragmentShader(Varying& fragVars, const Uniform& uniform)
+{
+    if (!uniform.lighting)
+        return getTextureColor(fragVars, uniform) * fragVars.color;
 
     if (uniform.lightPerPixel)
-        return texColor * fragVars.color * getLightColor(uniform, fragVars);
+        getLightColor(uniform, fragVars);
 
-    return (texColor * fragVars.color);
+    return getTextureColor(fragVars, uniform) * fragVars.color * (uniform.globalAmbient + fragVars.ambientColor + fragVars.diffuseColor) + fragVars.specularColor;
 }
 
 float interpolateFloat(const float3& value, const float3& weight)
@@ -201,7 +241,7 @@ float interpolateFloat(const float3& value, const float3& weight)
     return dot(value, weight);
 }
 
-Varying interpolateVarying(const Varying* varyings, const float3& weight)
+Varying interpolateVarying(const Varying varyings[3], const float3& weight)
 {
     Varying result;
 
@@ -216,28 +256,36 @@ Varying interpolateVarying(const Varying* varyings, const float3& weight)
     return result;
 }
 
-void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Varying* varying, const Uniform& uniform)
+void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const Varying varying[3], const Uniform& uniform)
 {
     // Get the bounding box
-    int xMin = min(screenCoords[0].x, min(screenCoords[1].x, screenCoords[2].x));
-    int yMin = min(screenCoords[0].y, min(screenCoords[1].y, screenCoords[2].y));
-    int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
-    int yMax = max(screenCoords[0].y, max(screenCoords[1].y, screenCoords[2].y));
+    int xMin = std::min(screenCoords[0].x, std::min(screenCoords[1].x, screenCoords[2].x));
+    int yMin = std::min(screenCoords[0].y, std::min(screenCoords[1].y, screenCoords[2].y));
+    int xMax = std::max(screenCoords[0].x, std::max(screenCoords[1].x, screenCoords[2].x));
+    int yMax = std::max(screenCoords[0].y, std::max(screenCoords[1].y, screenCoords[2].y));
 
-    float inversedArea = 1.f / getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
+    float area = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
+
+    if (area == 0.f)
+        return;
+
+    float inversedArea = 1.f / area;
+
+    float2 fragment;
 
     for (int i = xMin; i <= xMax; i++)
     {
+        fragment.x = i + 0.5f;
         for (int j = yMin; j <= yMax; j++)
         {
+            fragment.y = j + 0.5f;
+
             // Check if the pixel is in the triangle foreach segment
-            float2 pixel(i + 0.5f, j + 0.5f);
-            
-            float weight0 = getWeight(screenCoords[1].xy, screenCoords[2].xy, pixel) * inversedArea;
+            float weight0 = getWeight(screenCoords[1].xy, screenCoords[2].xy, fragment) * inversedArea;
             if (weight0 < 0.f)
                 continue;
-            
-            float weight1 = getWeight(screenCoords[2].xy, screenCoords[0].xy, pixel) * inversedArea;
+
+            float weight1 = getWeight(screenCoords[2].xy, screenCoords[0].xy, fragment) * inversedArea;
             if (weight1 < 0.f)
                 continue;
 
@@ -247,30 +295,36 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
 
             float3 weight(weight0, weight1, weight2);
 
-            // Depth test / z-buffer
-            if (uniform.depthTest)
-            {
-                float  z = interpolateFloat(float3(screenCoords[0].z, screenCoords[1].z, screenCoords[2].z), weight);
-                float* zBuffer = &fb.depthBuffer[j * fb.width + i];
-
-                if (*zBuffer >= z)
-                    continue;
-
-                *zBuffer = z;
-            }
-
             // Perspective correction
             if (uniform.perspectiveCorrection)
             {
-                float3 wVector(screenCoords[0].w, screenCoords[1].w, screenCoords[2].w);
-                weight *= wVector / interpolateFloat(wVector, weight);
+                float3 correctionFloats(screenCoords[0].w, screenCoords[1].w, screenCoords[2].w);
+                weight *= correctionFloats / interpolateFloat(correctionFloats, weight);
+            }
+
+            int fbIndex = j * fb.width + i;
+
+            float z, * zBuffer = nullptr;
+            if (uniform.depthTest)
+            {
+                float3 zFloats(screenCoords[0].z, screenCoords[1].z, screenCoords[2].z);
+
+                z = interpolateFloat(zFloats, weight);
+
+                zBuffer = &fb.depthBuffer[fbIndex];
+
+                if (*zBuffer >= z)
+                    continue;
             }
 
             Varying fragVarying = interpolateVarying(varying, weight);
-            
-            float4 color = fragmentShader(fragVarying, uniform);
-            color.a = 1.f;
-            drawPixel(fb.colorBuffer, fb.width, fb.height, i, j, color);
+
+            float4 fragColor = fragmentShader(fragVarying, uniform);
+
+            if (zBuffer && fragColor.a > 0.75f)
+                *zBuffer = z;
+
+            fb.colorBuffer[fbIndex] = fragColor * fragColor.a + fb.colorBuffer[fbIndex] * (1.f - fragColor.a);
         }
     }
 }
@@ -278,21 +332,43 @@ void rasterTriangle(const Framebuffer& fb, const float4* screenCoords, const Var
 float4 vertexShader(const rdrVertex& vertex, const Uniform& uniform, Varying& varying)
 {
     // Store triangle vertices positions
-    varying.coords = { vertex.x, vertex.y, vertex.z };
+    float4 localCoords(vertex.x, vertex.y, vertex.z, 1.f);
 
-    varying.normal = (uniform.model * float4{ vertex.nx, vertex.ny, vertex.nz, 0.f }).xyz;
+    varying.coords = (uniform.model * localCoords).xyz;
 
-    if (!uniform.lightPerPixel)
-        varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a) * getLightColor(uniform, varying);
-    else
-        varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a);
+    varying.normal = (uniform.model * float4(vertex.nx, vertex.ny, vertex.nz, 0.f)).xyz;
+
+    varying.color = float4(vertex.r, vertex.g, vertex.b, vertex.a) * uniform.globalColor;
+
+    if (!uniform.lightPerPixel && uniform.lighting)
+        getLightColor(uniform, varying);
 
     varying.uv = { vertex.u, vertex.v };
 
-    return uniform.mvp * float4{ varying.coords, 1.f };
+    return uniform.mvp * localCoords;
 }
 
-void drawTriangle(rdrImpl* renderer, const Uniform& uniform, const rdrVertex* vertices)
+bool faceCulling(const float3 ndcCoords[3], FaceType type)
+{
+    switch (type)
+    {
+    case FaceType::BACK:
+        return ((ndcCoords[2] - ndcCoords[0]) ^ (ndcCoords[1] - ndcCoords[0])).z > 0.f;
+
+    case FaceType::FRONT:
+        return ((ndcCoords[2] - ndcCoords[0]) ^ (ndcCoords[1] - ndcCoords[0])).z < 0.f;
+
+    case FaceType::FRONT_AND_BACK:
+        return true;
+
+    case FaceType::NONE:
+        return false;
+
+    default: return false;
+    }
+}
+
+void drawTriangle(rdrImpl* renderer, const Uniform& uniform, const rdrVertex vertices[3])
 {
     Varying varying[3];
 
@@ -308,33 +384,36 @@ void drawTriangle(rdrImpl* renderer, const Uniform& uniform, const rdrVertex* ve
     if (!isInside(clipCoords[0]) || !isInside(clipCoords[1]) || !isInside(clipCoords[2]))
         return;
 
+    float3 invertedW(1.f / clipCoords[0].w, 1.f / clipCoords[1].w, 1.f / clipCoords[2].w);
+
     // Clip space (v4) to NDC (v3)
     float3 ndcCoords[3] = {
-        { clipCoords[0].xyz / clipCoords[0].w },
-        { clipCoords[1].xyz / clipCoords[1].w },
-        { clipCoords[2].xyz / clipCoords[2].w },
+        { clipCoords[0].xyz * invertedW.e[0] },
+        { clipCoords[1].xyz * invertedW.e[1] },
+        { clipCoords[2].xyz * invertedW.e[2] },
     };
 
-    if (((ndcCoords[2] - ndcCoords[0]) ^ (ndcCoords[1] - ndcCoords[0])).z > 0 && renderer->uniform.backFaceCulling)
+    if (faceCulling(ndcCoords, renderer->uniform.faceToCull))
         return;
 
     // NDC (v3) to screen coords (v2)
     float4 screenCoords[3] = {
-        { ndcToScreenCoords(ndcCoords[0], renderer->viewport), 1.f / clipCoords[0].w },
-        { ndcToScreenCoords(ndcCoords[1], renderer->viewport), 1.f / clipCoords[1].w },
-        { ndcToScreenCoords(ndcCoords[2], renderer->viewport), 1.f / clipCoords[2].w },
+        { ndcToScreenCoords(ndcCoords[0], renderer->viewport), invertedW.e[0] },
+        { ndcToScreenCoords(ndcCoords[1], renderer->viewport), invertedW.e[1] },
+        { ndcToScreenCoords(ndcCoords[2], renderer->viewport), invertedW.e[2] },
     };
 
+    // Rasterize triangle
+    if (renderer->uniform.fillTriangle)
+        rasterTriangle(renderer->fb, screenCoords, varying, uniform);
+
+    // Draw triangle wireframe
     if (renderer->uniform.wireframeMode)
     {
-        // Draw triangle wireframe
         drawLine(renderer->fb, screenCoords[0].xyz, screenCoords[1].xyz, renderer->lineColor);
         drawLine(renderer->fb, screenCoords[1].xyz, screenCoords[2].xyz, renderer->lineColor);
         drawLine(renderer->fb, screenCoords[2].xyz, screenCoords[0].xyz, renderer->lineColor);
     }
-    else
-        // Rasterize triangle
-        rasterTriangle(renderer->fb, screenCoords, varying, uniform);
 }
 
 void rdrDrawTriangles(rdrImpl* renderer, const rdrVertex* vertices, int count)
@@ -355,8 +434,22 @@ void rdrShowImGuiControls(rdrImpl* renderer)
 {
     ImGui::Checkbox("wireframe", &renderer->uniform.wireframeMode);
     ImGui::Checkbox("depthtest", &renderer->uniform.depthTest);
+    ImGui::Checkbox("lighting", &renderer->uniform.lighting);
     ImGui::Checkbox("light per pixel", &renderer->uniform.lightPerPixel);
-    ImGui::Checkbox("backFaceCulling", &renderer->uniform.backFaceCulling);
+
+    const char* filterTypeStr[] = { "NEAREST", "BILINEAR" };
+    int filterTypeIndex = (int)renderer->uniform.textureFilter;
+    if (ImGui::Combo("Texture filter", &filterTypeIndex, filterTypeStr, IM_ARRAYSIZE(filterTypeStr)))
+        renderer->uniform.textureFilter = FilterType(filterTypeIndex);
+
+    const char* faceTypeStr[] = { "NONE", "BACK", "FRONT", "FRONT_AND_BACK" };
+    int faceTypeIndex = (int)renderer->uniform.faceToCull;
+    if (ImGui::Combo("Face to cull", &faceTypeIndex, faceTypeStr, IM_ARRAYSIZE(faceTypeStr)))
+        renderer->uniform.faceToCull = FaceType(faceTypeIndex);
+
     ImGui::Checkbox("perspectiveCorrection", &renderer->uniform.perspectiveCorrection);
+    ImGui::Checkbox("fillTriange", &renderer->uniform.fillTriangle);
     ImGui::ColorEdit4("lineColor", renderer->lineColor.e);
+
+    ImGui::DragFloat("shiness", &renderer->uniform.shiness, 0.f);
 }

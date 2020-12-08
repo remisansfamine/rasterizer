@@ -26,18 +26,22 @@ typedef struct rdrVertex
 typedef struct rdrLight
 {
     bool  enabled;
-    float x, y, z, w;
-    float dr, dg, db, da;
-    float ar, ag, ab, aa;
-    float sr, sg, sb, sa;
-    float power;
+    float position[4];
+    float ambient[4];
+    float diffuse[4];
+    float specular[4];
+    float attenuation[3];
 } rdrLight;
 
 enum rdrUniformType
 {
-    UT_TIME,      // 1 float
-    UT_DELTATIME, // 1 float
-
+    UT_TIME,            // 1 float
+    UT_DELTATIME,       // 1 float
+    UT_CAMERAPOS,       // 3 floats
+    UT_GLOBALAMBIENT,   // 4 floats
+    UT_GLOBALCOLOR,     // 4 floats
+    UT_DEPTHTEST,       // 1 bool
+    UT_STENCTILTEST,    // 1 bool
     UT_USER = 100,
 };
 
@@ -46,10 +50,11 @@ enum rdrUniformType
 // Color and depth buffer have to be valid until the shutdown of the renderer
 // Color buffer is RGBA, each component is a 32 bits float
 // Depth buffer is a buffer of 32bits floats
-RDR_API rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height);
+RDR_API rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int* stencilBuffer, int width, int height);
 RDR_API void rdrShutdown(rdrImpl* renderer);
 
 RDR_API void rdrSetUniformFloatV(rdrImpl* renderer, rdrUniformType type, float* value);
+RDR_API void rdrSetUniformBool(rdrImpl* renderer, rdrUniformType type, bool value);
 RDR_API void rdrSetUniformLight(rdrImpl* renderer, int index, rdrLight* light);
 
 // Matrix setup
