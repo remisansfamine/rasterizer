@@ -18,6 +18,9 @@ typedef struct rdrImpl rdrImpl;
 SCN_API scnImpl* scnCreate(void);
 SCN_API void scnDestroy(scnImpl* scene);
 
+// Set camera position
+SCN_API void scnSetCameraPosition(scnImpl* scene, float* cameraPosition);
+
 // Update scene and renders it
 SCN_API void scnUpdate(scnImpl* scene, float deltaTime, rdrImpl* renderer);
 

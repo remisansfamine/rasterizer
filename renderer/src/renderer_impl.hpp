@@ -18,6 +18,33 @@ enum class FilterType
     BILINEAR
 };
 
+struct rdrTexture
+{
+    int width = 0, height = 0;
+    float4* data = nullptr;
+};
+
+struct Light
+{
+    bool    isEnable = false;
+    float4  lightPos = { 0.f, 0.f, 0.f, 1.f };
+    float4  ambient = { 0.f, 0.f, 0.f, 0.f };
+    float4  diffuse = { 1.f, 1.f, 1.f, 1.f };
+    float4  specular = { 0.f, 0.f, 0.f, 0.f };
+    float   constantAttenuation = 1.f;
+    float   linearAttenuation = 0.f;
+    float   quadraticAttenuation = 0.f;
+};
+
+struct Material
+{
+    float4 ambientColor = { 1.f, 1.f, 1.f, 1.f };
+    float4 diffuseColor = { 1.f, 1.f, 1.f, 1.f };
+    float4 specularColor = { 1.f, 1.f, 1.f, 1.f };
+    float4 emissionColor = { 0.f, 0.f, 0.f, 0.f };
+    float shininess = 20.f;
+};
+
 struct Uniform
 {
     float time;
@@ -29,13 +56,20 @@ struct Uniform
 
     Light lights[8];
 
-    Texture texture;
+    rdrTexture texture;
+    Material material;
 
     float3 cameraPos;
+    mat4x4 viewProj;
     mat4x4 mvp;
     mat4x4 model;
     mat4x4 view;
     mat4x4 projection;
+
+    float gamma = 2.2f;
+    float iGamma = 1.f / 2.2f;
+
+    float cutout = 0.75f;
 
     bool depthTest = true;
     bool stencilTest = false;
@@ -43,7 +77,7 @@ struct Uniform
     FaceType faceToCull = FaceType::BACK;
     FilterType textureFilter = FilterType::NEAREST;
     bool lighting = true;
-    bool lightPerPixel = false;
+    bool phongModel = false;
     bool perspectiveCorrection = true;
     bool wMode = true;
     bool fillTriangle = true;
@@ -75,7 +109,6 @@ struct Framebuffer
     int height;
     float4* colorBuffer;
     float* depthBuffer;
-    int* stencilBuffer;
 };
 
 struct rdrImpl
