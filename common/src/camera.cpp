@@ -17,7 +17,7 @@ void Camera::update(float deltaTime, const CameraInputs& inputs)
 {
     const float MOUSE_SENSITIVITY = 0.5f;
 
-    speed += (inputs.speedUp - inputs.speedDown) * deltaTime;
+    speed += (inputs.speedUp - inputs.speedDown) * deltaTime * 4.f;
 
     yaw += inputs.deltaX * MOUSE_SENSITIVITY * deltaTime;
     pitch += inputs.deltaY * MOUSE_SENSITIVITY * deltaTime;

@@ -134,6 +134,11 @@ inline float4& operator*=(float4& v1, const float4& v2)
     return v1;
 }
 
+inline bool operator==(const float4& v1, const float4& v2)
+{
+    return v1.x == v2.x && v1.y == v2.y && v1.z == v2.z && v1.w == v2.w;
+}
+
 inline float4 operator*(const mat4x4& m, const float4& v)
 {
     float4 result;
@@ -247,7 +252,10 @@ inline float3 operator^(const float3& v1, const float3& v2)
     };
 }
 
-float3 getSphericalCoords(float r, float theta, float phi);
+inline float3 getSphericalCoords(float r, float theta, float phi)
+{
+    return { r * sinf(theta) * cosf(phi), r * cosf(theta), r * sinf(theta) * sinf(phi) };
+}
 
 inline float magnitude(const float3& v)
 {
@@ -257,6 +265,16 @@ inline float magnitude(const float3& v)
 inline float magnitude(const float4& v)
 {
     return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+}
+
+inline float dot(const float3& v1, const float3& v2)
+{
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+}
+
+inline float sqMagnitude(const float3& v)
+{
+    return dot(v, v);
 }
 
 inline float3 normalized(const float3& v)
@@ -279,11 +297,6 @@ inline float remap(float value, float oldMin, float oldMax, float newMin, float 
 inline float saturate(float value)
 {
     return std::clamp(value, 0.f, 1.f);
-}
-
-inline float dot(const float3& v1, const float3& v2)
-{
-    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
 inline float mod(float value, float dividend)

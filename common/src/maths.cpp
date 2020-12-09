@@ -75,8 +75,3 @@ mat4x4 mat4::perspective(float fovY, float aspect, float near, float far)
 
     return mat4::frustum(-right, right, -top, top, near, far);
 }
-
-float3 getSphericalCoords(float r, float theta, float phi)
-{
-    return { r * sinf(theta) * cosf(phi), r * cosf(theta), r * sinf(theta) * sinf(phi) };
-}

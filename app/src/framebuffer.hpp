@@ -16,7 +16,6 @@ struct Framebuffer
 
     float*  getColorBuffer() { return reinterpret_cast<float*>(colorBuffer.data()); }
     float*  getDepthBuffer() { return depthBuffer.data(); }
-    int*    getStencilBuffer() { return stencilBuffer.data(); }
 
     int getWidth()  const   { return width; }
     int getHeight() const   { return height; }
@@ -31,7 +30,6 @@ private:
     // In-RAM buffers
     std::vector<float4> colorBuffer;
     std::vector<float> depthBuffer;
-    std::vector<int> stencilBuffer;
 
     // OpenGL texture (in VRAM)
     GLuint colorTexture = 0;

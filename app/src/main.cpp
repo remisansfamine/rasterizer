@@ -128,7 +128,6 @@ int main(int argc, char* argv[])
     rdrImpl* renderer = rdrInit(
         framebuffer.getColorBuffer(),
         framebuffer.getDepthBuffer(),
-        framebuffer.getStencilBuffer(),
         framebuffer.getWidth(), framebuffer.getHeight());
 
     rdrSetImGuiContext(renderer, ImGui::GetCurrentContext());
@@ -189,7 +188,7 @@ int main(int argc, char* argv[])
         framebuffer.clear();
 
         // Setup matrices
-        rdrSetUniformFloatV(renderer, UT_CAMERAPOS, camera.position.e);
+        rdrSetUniformFloatV(renderer, UT_CAMERA_POS, camera.position.e);
         rdrSetUniformFloatV(renderer, UT_DELTATIME, &deltaTime);
         rdrSetUniformFloatV(renderer, UT_TIME, &time);
 
@@ -199,6 +198,7 @@ int main(int argc, char* argv[])
         rdrSetView(renderer, view.e);
 
         // Render scene
+        scnSetCameraPosition(scene, camera.position.e);
         scnUpdate(scene, deltaTime, renderer);
 
         // Upload texture

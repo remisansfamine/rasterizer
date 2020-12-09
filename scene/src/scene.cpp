@@ -16,21 +16,55 @@
 #include <iostream>
 #include <algorithm>
 
-Texture* loadTexture(std::vector<Texture>& textures, const char* filePath)
+int loadTexture(std::vector<Texture>& textures, const char* filePath)
 {
+    std::vector<Texture>::iterator it = std::find_if(textures.begin(), textures.end(),
+                                        [filePath](Texture& t)
+                                        { return t.fileName.compare(filePath) == 0; });
+
+    if (it != textures.end())
+        return it - textures.begin();
+
     Texture texture;
     texture.fileName = filePath;
-    texture.data = (float4*)stbi_loadf(filePath, &texture.width, &texture.height, nullptr, STBI_rgb_alpha);
+    texture.data = stbi_loadf(filePath, &texture.width, &texture.height, nullptr, STBI_rgb_alpha);
 
     if (!texture.data)
-        return nullptr;
+        return -1;
 
     textures.push_back(texture);
 
-    return &textures.back();
+    return textures.size() - 1;
 }
 
-bool loadObject(std::vector<Face>& faces, std::vector<Texture>& textures, std::string filePath, std::string mtlBasedir, float scale = 1.f)
+int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffuse[3], float emissive[3], float specular[3], float shininess)
+{
+    Material mat;
+    mat.ambientColor = float4(ambient[0], ambient[1], ambient[2], 1.f);
+    mat.diffuseColor = float4(diffuse[0], diffuse[1], diffuse[2], 1.f);
+    mat.specularColor = float4(specular[0], specular[1], specular[2], 1.f);
+    mat.emissionColor = float4(emissive[0], emissive[1], emissive[2], 0.f);
+    mat.shininess = shininess;
+
+    std::vector<Material>::iterator it = std::find_if(materials.begin(), materials.end(),
+                                        [mat](const Material& m)
+                                        {
+                                            return m.shininess == mat.shininess &&
+                                                   m.ambientColor == mat.ambientColor &&
+                                                   m.diffuseColor == mat.diffuseColor &&
+                                                   m.specularColor == mat.specularColor &&
+                                                   m.emissionColor == mat.emissionColor;
+                                        });
+
+    if (it != materials.end())
+        return it - materials.begin();
+
+    materials.push_back(mat);
+
+    return materials.size() - 1;
+}
+
+bool loadObject(std::vector<Face>& faces, std::vector<Texture>& scnTextures, std::vector<Material>& scnMaterials, std::string filePath, std::string mtlBasedir, float scale = 1.f)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -51,16 +85,6 @@ bool loadObject(std::vector<Face>& faces, std::vector<Texture>& textures, std::s
 
     if (!ret) {
         return 0;
-    }
-
-    for (tinyobj::material_t& mat : materials)
-    {
-        std::string tex_filepath = mtlBasedir + mat.diffuse_texname;
-
-        if (std::find_if(textures.begin(), textures.end(),
-            [tex_filepath](Texture& t)
-            { return t.fileName.compare(tex_filepath) == 0; }) == textures.end())
-            loadTexture(textures, tex_filepath.c_str());
     }
 
     // Loop over shapes
@@ -96,8 +120,7 @@ bool loadObject(std::vector<Face>& faces, std::vector<Texture>& textures, std::s
                     vertice.r = attrib.colors[3 * idx.vertex_index + 0];
                     vertice.g = attrib.colors[3 * idx.vertex_index + 1];
                     vertice.b = attrib.colors[3 * idx.vertex_index + 2];
-                    vertice.a = 1.f;
-                    //vertice.a = attrib.colors[3 * idx.vertex_index + 3];
+                    vertice.a = attrib.colors.size() == 4 ? attrib.colors[3 * idx.vertex_index + 3] : 1.f;
                 }
 
                 if (!attrib.texcoords.empty())
@@ -114,15 +137,10 @@ bool loadObject(std::vector<Face>& faces, std::vector<Texture>& textures, std::s
             if (!materials.empty())
             {
                 tinyobj::material_t& mat = materials[shapes[s].mesh.material_ids[f]];
+                
+                face.textureIndex = loadTexture(scnTextures, (mtlBasedir + mat.diffuse_texname).c_str());
 
-                for (Texture& texture : textures)
-                {
-                    if (texture.fileName.compare(mtlBasedir + mat.diffuse_texname) == 0)
-                    {
-                        face.texture = &texture;
-                        break;
-                    }
-                }
+                face.materialIndex = loadMaterial(scnMaterials, mat.ambient, mat.diffuse, mat.specular, mat.emission, mat.shininess);
             }
             faces.push_back(face);
         }
@@ -131,8 +149,10 @@ bool loadObject(std::vector<Face>& faces, std::vector<Texture>& textures, std::s
     return 1;
 }
 
-void loadQuad(std::vector<Face>& faces, int hRes = 1, int vRes = 1)
+void loadQuad(std::vector<Face>& faces, std::vector<Texture>* textures = nullptr, const char* filePath = nullptr, int hRes = 1, int vRes = 1)
 {
+    int index = textures && filePath ? loadTexture(*textures, filePath) : -1;
+
     float hGrad = 1.f / (float)hRes;
     float vGrad = 1.f / (float)vRes;
     for (int i = 0; i < hRes; i++)
@@ -150,12 +170,14 @@ void loadQuad(std::vector<Face>& faces, int hRes = 1, int vRes = 1)
             face1.vertices.push_back({ u0 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u0, v0 });
             face1.vertices.push_back({ u1 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u1, v0 });
             face1.vertices.push_back({ u1 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u1, v1 });
+            face1.textureIndex = index;
             faces.push_back(face1);
 
             Face face2;
             face2.vertices.push_back({ u1 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u1, v1 });
             face2.vertices.push_back({ u0 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u0, v1 });
             face2.vertices.push_back({ u0 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u0, v0 });
+            face2.textureIndex = index;
             faces.push_back(face2);
         }
     }
@@ -183,6 +205,11 @@ void scnDestroy(scnImpl* scene)
     delete scene;
 }
 
+void scnSetCameraPosition(scnImpl* scene, float* cameraPos)
+{
+    memcpy(scene->cameraPos.e, cameraPos, sizeof(float3));
+}
+
 void scnUpdate(scnImpl* scene, float deltaTime, rdrImpl* renderer)
 {
     scene->update(deltaTime, renderer);
@@ -207,21 +234,25 @@ scnImpl::scnImpl()
     loadTexture(textures, "assets/inputbilinear.png");
     loadTexture(textures, "assets/Deathclaw.png");
 
-    Object obj1;
-    loadQuad(obj1.faces);
+    lights[0].lightPos = { 0.f, -5.f, 0.f, 1.f };
+
+    Object obj1({0.f, 0.f, -2.f});
+    loadQuad(obj1.faces, &textures, "assets/inputbilinear.png");
     objects.push_back(obj1);
 
-    Object obj2;
-    loadQuad(obj2.faces);
+    Object obj2({ 0.f, 0.f, -2.f }, { 0.f, M_PI, 0.f });
+    loadQuad(obj2.faces, &textures, "assets/Deathclaw.png");
     //if (loadObject(obj2.vertices, "assets/sphere.obj", "assets", 0.5f))
     objects.push_back(obj2);
     
-    Object obj3;
-    loadObject(obj3.faces, textures, "assets/the_noble_craftsman.obj", "assets/");
+    Object obj3({ -2.f, 0.f, 0.f });
+    loadObject(obj3.faces, textures, materials, "assets/the_noble_craftsman.obj", "assets/");
     objects.push_back(obj3);
 
     Object obj4;
-    loadObject(obj4.faces, textures, "assets/deathclaw.obj", "assets/", 0.005f);
+    obj4.isEnable = false;
+    //loadObject(obj4.faces, textures, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
+    loadObject(obj4.faces, textures, materials, "assets/sphere.obj", "assets/");
     //loadObject(obj4.faces, textures, "assets/suzanne.obj", "assets/");
     objects.push_back(obj4);
 }
@@ -233,37 +264,29 @@ scnImpl::~scnImpl()
     // HERE: Unload the scene
 }
 
-void scnImpl::drawObject(Object object, rdrImpl* renderer)
+void editLights(rdrImpl* renderer, scnImpl* scene)
 {
-    for (const Face& face : object.faces)
-    {
-        if (face.texture && face.texture->data && face.texture->height > 0 && face.texture->width > 0)
-            rdrSetTexture(renderer, face.texture->data->e, face.texture->width, face.texture->height);
+    if (!scene || !renderer)
+        return;
 
-        rdrDrawTriangles(renderer, face.vertices.data(), (int)face.vertices.size());
-    }
-}
-
-void editLight(rdrImpl* renderer, scnImpl* scene)
-{
     static int selectedLight = 0;
     if (ImGui::TreeNode("Lights"))
     {
         if (ImGui::SliderFloat4("Global ambient", scene->globalAmbient.e, 0.f, 1.f))
             rdrSetUniformFloatV(renderer, UT_GLOBALAMBIENT, scene->globalAmbient.e);
 
-        ImGui::SliderInt("Selected light", &selectedLight, 0, 7);
-        ImGui::Checkbox("Is enable", &scene->lights[selectedLight].isEnable);
+        ImGui::SliderInt("Selected light", &selectedLight, 0, IM_ARRAYSIZE(scene->lights));
+        ImGui::Checkbox("Is light enable", &scene->lights[selectedLight].isEnable);
 
-        ImGui::SliderFloat4("Position", scene->lights[selectedLight].lightPos.e, -10.f, 10.f);
+        ImGui::SliderFloat4("Light position", scene->lights[selectedLight].lightPos.e, -10.f, 10.f);
 
         bool isPoint = scene->lights[selectedLight].lightPos.w == 1.f;
         if (ImGui::Checkbox("Is point light", (bool*)&isPoint));
             scene->lights[selectedLight].lightPos.w = isPoint;
 
-        ImGui::SliderFloat4("Ambient", scene->lights[selectedLight].ambient.e, 0.f, 1.f);
-        ImGui::SliderFloat4("Diffuse", scene->lights[selectedLight].diffuse.e, 0.f, 1.f);
-        ImGui::SliderFloat4("Specular", scene->lights[selectedLight].specular.e, 0.f, 1.f);
+        ImGui::ColorEdit4("Ambient", scene->lights[selectedLight].ambient.e);
+        ImGui::ColorEdit4("Diffuse", scene->lights[selectedLight].diffuse.e);
+        ImGui::ColorEdit4("Specular", scene->lights[selectedLight].specular.e);
 
         ImGui::SliderFloat("Constant attenuation", &scene->lights[selectedLight].constantAttenuation, 0.f, 10.f);
         ImGui::SliderFloat("Linear attenuation", &scene->lights[selectedLight].linearAttenuation, 0.f, 10.f);
@@ -275,85 +298,102 @@ void editLight(rdrImpl* renderer, scnImpl* scene)
     }
 }
 
+void editMaterials(scnImpl* scene)
+{
+    static int selectedMaterial = 0;
+    if (ImGui::TreeNode("Materials"))
+    {
+        ImGui::SliderInt("Selected material", &selectedMaterial, 0, scene->materials.size() - 1);
+
+        ImGui::ColorEdit3("Ambient", scene->materials[selectedMaterial].ambientColor.e);
+        ImGui::ColorEdit3("Diffuse", scene->materials[selectedMaterial].diffuseColor.e);
+        ImGui::ColorEdit3("Specular", scene->materials[selectedMaterial].specularColor.e);
+        ImGui::ColorEdit3("Emission", scene->materials[selectedMaterial].emissionColor.e);
+
+        ImGui::DragFloat("shininess", &scene->materials[selectedMaterial].shininess, 0.f);
+    }
+}
+
+
+void editObjects(scnImpl* scene)
+{
+    if (!scene)
+        return;
+
+    static int selectedObject = 0;
+    if (ImGui::TreeNode("Objects"))
+    {
+        ImGui::SliderInt("Selected object", &selectedObject, 0, scene->objects.size() - 1);
+
+        ImGui::Checkbox("Is object enable", &scene->objects[selectedObject].isEnable);
+
+        ImGui::SliderFloat4("Object position", scene->objects[selectedObject].position.e, -10.f, 10.f);
+        ImGui::SliderFloat4("Rotation", scene->objects[selectedObject].rotation.e, -10.f, 10.f);
+        ImGui::SliderFloat4("Scale", scene->objects[selectedObject].scale.e, -10.f, 10.f);
+
+        static int selectedFace = 0;
+        ImGui::SliderInt("Selected light", &selectedFace, 0, scene->objects[selectedObject].faces.size() - 1);
+        ImGui::SliderInt("Texture index", &scene->objects[selectedObject].faces[selectedFace].textureIndex, -1, scene->textures.size() - 1);
+
+        ImGui::TreePop();
+    }
+}
+
+void scnImpl::drawObject(Object object, rdrImpl* renderer)
+{
+    if (!object.isEnable)
+        return;
+
+    // Get the model matrix of the current object
+    rdrSetModel(renderer, object.getModel().e);
+
+    // Then draw all his face
+    for (const Face& face : object.faces)
+    {
+        if (face.materialIndex >= 0)
+            rdrSetUniformMaterial(renderer, (rdrMaterial*)&materials[face.materialIndex]);
+        else 
+            rdrSetUniformMaterial(renderer, (rdrMaterial*)&defaultMaterial);
+
+
+        if (face.textureIndex >= 0 &&
+            textures[face.textureIndex].data &&
+            textures[face.textureIndex].height > 0 &&
+            textures[face.textureIndex].width > 0)
+            rdrSetTexture(renderer, textures[face.textureIndex].data, textures[face.textureIndex].width, textures[face.textureIndex].height);
+        else
+            rdrSetTexture(renderer, nullptr, 0, 0);
+
+        rdrDrawTriangles(renderer, face.vertices.data(), (int)face.vertices.size());
+    }
+}
+
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
-    //rdrSetUniformBool(renderer, UT_DEPTHTEST, true);
     rdrSetUniformBool(renderer, UT_STENCTILTEST, false);
 
-    float4 color = { 1.f,1.f,1.f,1.f };
-    rdrSetUniformFloatV(renderer, UT_GLOBALCOLOR, color.e);
+    float4 color = { 1.f, 1.f, 1.f, 0.5f };
+    //rdrSetUniformFloatV(renderer, UT_GLOBALCOLOR, color.e);
 
-    editLight(renderer, this);
+    editLights(renderer, this);
 
     time += deltaTime;
+
+    // Shoud use pos - camera pos
+    // Sort all objects with their distance
+    const float3& camPos = cameraPos;
+    std::vector<Object> sortedObjects = objects;
+    sort(sortedObjects.begin(), sortedObjects.end(),
+        [camPos](const Object& a, const Object& b)
+        { return sqMagnitude(camPos - a.position) > sqMagnitude(camPos - b.position); });
     
-    rdrSetTexture(renderer, textures[0].data->e, textures[0].width, textures[0].height);
-
-    objects[0].model = mat4::translate({ 0.f, 0.f, -3.f });// *mat4::rotateY(time);
-    rdrSetModel(renderer, objects[0].model.e);
-
-    // Draw
-    drawObject(objects[0], renderer);
-
-    if (objects.size() <= 2)
-        return;
-    
-    //rdrSetTexture(renderer, textures[1].data, textures[1].width, textures[1].height);
-    rdrSetTexture(renderer, nullptr, textures[1].width, textures[1].height);
-
-    color = { 1.f, 0.f, 0.f,0.5f };
-    //rdrSetUniformFloatV(renderer, UT_GLOBALCOLOR, color.e);
-
-    objects[3].model = mat4::translate({ 0.f, -5.f, 0.f });// *mat4::rotateY(time);
-    rdrSetModel(renderer, objects[3].model.e);
-
-    drawObject(objects[3], renderer);
-
-    color = { 0.f,0.f,1.f,0.5f };
-    //rdrSetUniformFloatV(renderer, UT_GLOBALCOLOR, color.e);
-
-    objects[3].model = mat4::translate({ 0.f, -5.f, -2.f });// *mat4::rotateY(time);
-    rdrSetModel(renderer, objects[3].model.e);
-
-    drawObject(objects[3], renderer);
-
-    color = { 0.f, 1.f, 0.f,0.5f };
-    //rdrSetUniformFloatV(renderer, UT_GLOBALCOLOR, color.e);
-
-    objects[3].model = mat4::translate({ 0.f, -5.f, -4.f });// *mat4::rotateY(time);
-    rdrSetModel(renderer, objects[3].model.e);
-
-    drawObject(objects[3], renderer);
-
-    /*// Draw craftsman
-    objects[2].scale = { scale, scale, scale };
-
-    rdrSetModel(renderer, objects[2].getModel().e);
-
-    drawObject(objects[2], renderer);
-
-    // Draw ground
-    rdrSetTexture(renderer, nullptr, 0, 0);
-
-    objects[1].model = mat4::rotateX(-M_PI * 0.5f) * mat4::scale({ 3.f, 3.f, 3.f });
-
-    rdrSetModel(renderer, objects[1].model.e);
-
-    drawObject(objects[1], renderer);
-
-    rdrSetUniformBool(renderer, UT_DEPTHTEST, false);
-
-    // Draw mirror
-    mat4x4 mirror = objects[2].getModel() * mat4::rotateZ(M_PI);
-
-    rdrSetModel(renderer, mirror.e);
-
-    drawObject(objects[2], renderer);*/
+    // Draw all objects
+    for (const auto& object : sortedObjects)
+        drawObject(object, renderer);
 }
 
 void scnImpl::showImGuiControls()
 {
-    ImGui::SliderFloat("scale", &scale, 0.f, 1.f);
-
-    ImGui::DragFloat3("sphere position", objects[2].position.e);
+    editObjects(this);
+    editMaterials(this);
 }
