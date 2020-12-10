@@ -5,7 +5,7 @@
       <Filter>private</Filter>
     </ClInclude>
     <ClInclude Include="include\rdr\renderer.h">
-      <Filter>public</Filter>
+      <Filter>private\public</Filter>
     </ClInclude>
     <ClInclude Include="..\common\include\common\types.hpp">
       <Filter>private\common</Filter>
@@ -15,9 +15,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="public">
-      <UniqueIdentifier>{fbbfc75b-b78d-42f4-bd2a-e64fe0b2d7a0}</UniqueIdentifier>
-    </Filter>
     <Filter Include="private">
       <UniqueIdentifier>{69129f0f-19f5-4fca-a3a7-67605fa2e7f8}</UniqueIdentifier>
     </Filter>
@@ -26,6 +23,9 @@
     </Filter>
     <Filter Include="private\third_party">
       <UniqueIdentifier>{64ef0cec-ea01-46c9-8725-3ba3a4950734}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="private\public">
+      <UniqueIdentifier>{fbbfc75b-b78d-42f4-bd2a-e64fe0b2d7a0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -42,7 +42,7 @@
       <Filter>private\third_party</Filter>
     </ClCompile>
     <ClCompile Include="src\renderer.cpp">
-      <Filter>private\third_party</Filter>
+      <Filter>private</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

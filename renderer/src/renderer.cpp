@@ -316,7 +316,12 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
     int xMax = std::max(screenCoords[0].x, std::max(screenCoords[1].x, screenCoords[2].x));
     int yMax = std::max(screenCoords[0].y, std::max(screenCoords[1].y, screenCoords[2].y));
 
-    float inversedArea = 1.f / getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
+    float area = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
+
+    if (area == 0.f)
+        return;
+
+    float inversedArea = 1.f / area;
 
     float2 fragment;
     float3 weight;
@@ -487,6 +492,9 @@ void rdrShowImGuiControls(rdrImpl* renderer)
     ImGui::Checkbox("perspectiveCorrection", &renderer->uniform.perspectiveCorrection);
     ImGui::Checkbox("fillTriange", &renderer->uniform.fillTriangle);
     ImGui::ColorEdit4("lineColor", renderer->lineColor.e);
+
+    ImGui::ColorEdit4("Global ambient", renderer->uniform.globalAmbient.e);
+    ImGui::ColorEdit4("Global color", renderer->uniform.globalColor.e);
 
     ImGui::SliderFloat("Cutout", &renderer->uniform.cutout, 0.f, 1.f);
 }
