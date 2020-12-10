@@ -38,7 +38,7 @@ struct Light
 
 struct Material
 {
-    float4 ambientColor = { 1.f, 1.f, 1.f, 1.f };
+    float4 ambientColor = { 0.f, 0.f, 0.f, 0.f };
     float4 diffuseColor = { 1.f, 1.f, 1.f, 1.f };
     float4 specularColor = { 1.f, 1.f, 1.f, 1.f };
     float4 emissionColor = { 0.f, 0.f, 0.f, 0.f };
@@ -69,7 +69,7 @@ struct Uniform
     float gamma = 2.2f;
     float iGamma = 1.f / 2.2f;
 
-    float cutout = 0.75f;
+    float cutout = 0.f;
 
     bool depthTest = true;
     bool stencilTest = false;

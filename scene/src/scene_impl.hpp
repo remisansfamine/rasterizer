@@ -11,17 +11,24 @@ struct Texture
     float* data = nullptr;
 };
 
-struct Face
+struct Triangle
 {
     std::vector<rdrVertex> vertices;
     int textureIndex  = -1;
     int materialIndex = -1;
 };
 
+struct Mesh
+{
+    std::vector<Triangle> faces;
+    int textureIndex = -1;
+    int materialIndex = -1;
+};
+
 struct Object
 {
     bool isEnable = true;
-    std::vector<Face> faces;
+    std::vector<Mesh> mesh;
     float3 position = { 0.f, 0.f, 0.f };
     float3 rotation = { 0.f, 0.f, 0.f };
     float3 scale = { 1.f, 1.f, 1.f };
@@ -32,7 +39,7 @@ struct Object
         : position(pos), rotation(rot), scale(scale) {}
 
     // Return the object model with his transform
-    mat4x4 getModel() { return mat4::rotateX(rotation.x) * mat4::rotateY(rotation.y) * mat4::translate(position) * mat4::scale(scale); }
+    mat4x4 getModel() const { return mat4::rotateX(rotation.x) * mat4::rotateY(rotation.y) * mat4::translate(position) * mat4::scale(scale); }
 };
 
 struct Light
@@ -64,8 +71,6 @@ struct scnImpl
 
     void showImGuiControls();
 
-    float4 globalAmbient = {0.2f, 0.2f, 0.2f, 1.f };
-
     std::vector<Object> objects;
     std::vector<Texture> textures;
 
@@ -81,9 +86,7 @@ struct scnImpl
     std::vector<Material> materials;
     Light lights[8];
 
-    bool subdivide = false;
-
-    float3 cameraPos;
+    float3 cameraPos = { 0.f, 0.f, 0.f };
 
     private:
         void drawObject(Object object, rdrImpl* renderer);
