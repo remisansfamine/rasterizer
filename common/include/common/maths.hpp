@@ -96,6 +96,12 @@ inline float4 operator-(const float4& v1, const float4& v2)
     return { v1.x + -v2.x, v1.y + -v2.y, v1.z + -v2.z, v1.w + -v2.w };
 }
 
+inline float4 operator-=(float4& v1, const float4& v2)
+{
+    v1 = v1 - v2;
+    return v1;
+}
+
 inline float4 operator*(const float4& v, float scale)
 {
     return { v.x * scale, v.y * scale, v.z * scale, v.w * scale };
@@ -306,13 +312,13 @@ inline float mod(float value, float dividend)
 }
 
 template<typename T>
-inline T lerp(T value0, T value1, float t)
+inline T lerp(T value0, T value1, float lambda)
 {
-    return (1 - t) * value0 + t * value1;
+    return lambda * value1 + (1.f - lambda) * value0;
 }
 
 template<typename T>
-inline T bilinear(const float& s, const float& t, const T values[4])
+inline T bilinear(const float& lambda1, const float& lambda2, const T values[4])
 {
-    return lerp(lerp(values[0], values[1], s), lerp(values[2], values[3], s), t);
+    return lerp(lerp(values[0], values[1], lambda1), lerp(values[2], values[3], lambda1), lambda2);
 }

@@ -37,7 +37,7 @@ int loadTexture(std::vector<Texture>& textures, const char* filePath)
     return textures.size() - 1;
 }
 
-int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffuse[3], float emissive[3], float specular[3], float shininess)
+int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess)
 {
     Material mat;
     mat.ambientColor = float4(ambient[0], ambient[1], ambient[2], 1.f);
@@ -164,12 +164,11 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
     return 1;
 }
 
-void loadQuad(Object& object, std::vector<Texture>* textures = nullptr, const char* filePath = nullptr, int hRes = 1, int vRes = 1)
+void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int hRes = 1, int vRes = 1)
 {
-    int index = textures && filePath ? loadTexture(*textures, filePath) : -1;
-
     Mesh mesh;
-    mesh.textureIndex = index;
+    mesh.textureIndex = textureIndex;
+    mesh.materialIndex = materialIndex;
 
     float hGrad = 1.f / (float)hRes;
     float vGrad = 1.f / (float)vRes;
@@ -200,9 +199,12 @@ void loadQuad(Object& object, std::vector<Texture>* textures = nullptr, const ch
     object.mesh.push_back(mesh);
 }
 
-void loadTriangle(Object& object)
+void loadTriangle(Object& object, int textureIndex = -1, int materialIndex = 0)
 {
     Mesh mesh;
+    mesh.textureIndex = textureIndex;
+    mesh.materialIndex = materialIndex;
+
     Triangle face;
 
     //                          pos                   normal                  color                     uv
@@ -253,19 +255,19 @@ scnImpl::scnImpl()
     loadTexture(textures, "assets/inputbilinear.png");
     loadTexture(textures, "assets/Deathclaw.png");
 
-    lights[0].lightPos = { 0.f, -5.f, 0.f, 1.f };
+    lights[0].lightPos = { 0.f, 5.f, 0.f, 1.f };
 
     Object obj1({0.f, 0.f, -2.f});
-    loadQuad(obj1, &textures, "assets/inputbilinear.png");
+    loadQuad(obj1, loadTexture(textures, "assets/inputbilinear.png"));
     objects.push_back(obj1);
 
     Object obj2({ 0.f, 0.f, -2.f }, { 0.f, M_PI, 0.f });
-    loadQuad(obj2, &textures, "assets/Deathclaw.png");
+    //loadQuad(obj2, &textures, "assets/Deathclaw.png");
     //if (loadObject(obj2.vertices, "assets/sphere.obj", "assets", 0.5f))
     objects.push_back(obj2);
     
     Object obj3;
-    loadObject(obj3, textures, materials, "assets/the_noble_craftsman", "assets/");
+    loadObject(obj3, textures, materials, "assets/Stone.obj", "assets/", 0.1f);
     objects.push_back(obj3);
 
     Object obj4;
@@ -291,7 +293,7 @@ void editLights(rdrImpl* renderer, scnImpl* scene)
     static int selectedLight = 0;
     if (ImGui::TreeNode("Lights"))
     {
-        ImGui::SliderInt("Selected light", &selectedLight, 0, IM_ARRAYSIZE(scene->lights));
+        ImGui::SliderInt("Selected light", &selectedLight, 0, IM_ARRAYSIZE(scene->lights) - 1);
         ImGui::Checkbox("Is light enable", &scene->lights[selectedLight].isEnable);
 
         ImGui::SliderFloat4("Light position", scene->lights[selectedLight].lightPos.e, -10.f, 10.f);
@@ -330,7 +332,6 @@ void editMaterials(scnImpl* scene)
     }
 }
 
-
 void editObjects(scnImpl* scene)
 {
     if (!scene)
@@ -347,10 +348,12 @@ void editObjects(scnImpl* scene)
         ImGui::SliderFloat4("Rotation", scene->objects[selectedObject].rotation.e, -10.f, 10.f);
         ImGui::SliderFloat4("Scale", scene->objects[selectedObject].scale.e, -10.f, 10.f);
 
-        static int selectedMesh = 0;
-        ImGui::SliderInt("Selected light", &selectedMesh, 0, scene->objects[selectedObject].mesh.size() - 1);
-        ImGui::SliderInt("Texture index", &scene->objects[selectedObject].mesh[selectedMesh].textureIndex, -1, scene->textures.size() - 1);
-
+        if (!scene->objects[selectedObject].mesh.empty())
+        {
+            static int selectedMesh = 0;
+            ImGui::SliderInt("Selected mesh", &selectedMesh, 0, scene->objects[selectedObject].mesh.size() - 1);
+            ImGui::SliderInt("Texture index", &scene->objects[selectedObject].mesh[selectedMesh].textureIndex, -1, scene->textures.size() - 1);
+        }
         ImGui::TreePop();
     }
 }
@@ -366,11 +369,8 @@ void scnImpl::drawObject(Object object, rdrImpl* renderer)
     // Then draw all his mesh
     for (const Mesh& mesh : object.mesh)
     {
-
         if (mesh.materialIndex >= 0)
             rdrSetUniformMaterial(renderer, (rdrMaterial*)&materials[mesh.materialIndex]);
-        else
-            rdrSetUniformMaterial(renderer, (rdrMaterial*)&defaultMaterial);
 
         if (mesh.textureIndex >= 0 &&
             textures[mesh.textureIndex].data &&

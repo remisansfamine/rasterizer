@@ -11,9 +11,14 @@
 
 #include <algorithm>
 
-#include <cmath>
-
 #include <iostream>
+#include <bitset>
+
+struct clipPoint
+{
+    float4 coords;
+    float3 weights;
+};
 
 rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height)
 {
@@ -203,30 +208,35 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
     const rdrTexture& texture = uniform.texture;
 
     // Get tex coords with UVs
+    float u = mod(fragVars.uv.u, 1.f);
+    float v = mod(fragVars.uv.v, 1.f);
+
+    // Get texel color with tex coords
     float4 texColor;
     if (uniform.textureFilter == FilterType::BILINEAR)
     {
-        float s = (texture.width - 1.f) * mod(fragVars.uv.u, 1.f);
-        float t = (texture.height - 1.f) * mod(fragVars.uv.v, 1.f);
+        float s = (texture.width  - 1.f) * u;
+        float t = (texture.height - 1.f) * v;
 
         int si = int(s), ti = int(t);
 
-        int tindex = ti * texture.width;
+        float lambda0 = s - si, lambda1 = t - ti;
 
         const float4 colors[4] =
         {
-            texture.data[ti * texture.width + si],
-            texture.data[ti * texture.width + si + 1],
-            texture.data[(ti + 1) * texture.width + si],
-            texture.data[(ti + 1) * texture.width + si + 1],
+            texture.data[ti * texture.width + si],              // C00
+            texture.data[ti * texture.width + (si + 1)],        // C10
+            texture.data[(ti + 1) * texture.width + si],        // C01
+            texture.data[(ti + 1) * texture.width + (si + 1)],  // C11
         };
-        texColor = bilinear(s - si, t - ti, colors);
+
+        texColor = bilinear(lambda0, lambda1, colors);
     }
     else
     {
-        int s = (texture.width) * mod(fragVars.uv.u, 1.f);
-        int t = (texture.height) * mod(fragVars.uv.v, 1.f);
-        texColor = texture.data[t * texture.width + s];
+        float s = texture.width * u;
+        float t = texture.height * v;
+        texColor = texture.data[int(t) * texture.width + int(s)];
     }
 
     return texColor;
@@ -300,7 +310,7 @@ bool getBarycentric(const float4 screenCoords[3], const float2& pixelCoords, flo
 
 bool alphaTest(const Uniform& uniform, float alpha)
 {
-    return alpha > uniform.cutout;
+    return alpha >= uniform.cutout;
 }
 
 void perspectiveCorrection(const float3 correctionFloats, float3& weight)
@@ -394,16 +404,89 @@ bool faceCulling(const float3 ndcCoords[3], FaceType type)
 
     switch (type)
     {
-    case FaceType::BACK: return normalZ > 0.f;
+        case FaceType::BACK: return normalZ > 0.f;
 
-    case FaceType::FRONT: return normalZ < 0.f;
+        case FaceType::FRONT: return normalZ < 0.f;
 
-    case FaceType::FRONT_AND_BACK: return normalZ != 0.f;
+        case FaceType::FRONT_AND_BACK: return normalZ != 0.f;
 
-    case FaceType::NONE: return normalZ == 0.f;
+        case FaceType::NONE: return normalZ == 0.f;
 
-    default: return false;
+        default: return false;
     }
+}
+
+unsigned char computeClipOutcodes(const float4 clipCoords)
+{
+    unsigned char code = 0;
+    unsigned char plane = 0;
+
+    for (int i = 0; i < 8; i++)
+    {
+        plane = 1 << i;
+        
+        if ((i < 4  && clipCoords.e[i] > clipCoords.w) ||
+            (i >= 4 && clipCoords.e[i - 4] < -clipCoords.w))
+            code |= plane;
+    }
+
+    return code;
+}
+
+int clipTriangle(clipPoint* outputCoords, unsigned char outputCodes)
+{
+    if (!outputCodes)
+        return 3;
+
+    int count = 0;
+
+    // RIGHT
+    if (outputCodes & 00000001)
+    {
+        std::cout << "right" << std::endl;
+    }
+    // LEFT
+    if (outputCodes & 00010000)
+    {
+        std::cout << "left" << std::endl;
+
+    }
+
+    if (00010000)
+    {
+        std::bitset<8> b1(outputCodes);
+        std::bitset<8> b2(outputCodes & 00010000);
+        std::cout << "b1 = " << b1 << std::endl;
+        std::cout << "b2 = " << b2 << std::endl;
+    }
+
+    // TOP
+    if (outputCodes & 00000010)
+    {
+        std::cout << "up" << std::endl;
+
+    }
+    // BOTTOM
+    if (outputCodes & 00100000)
+    {
+        std::cout << "down" << std::endl;
+
+    }
+
+    // FRONT
+    if (outputCodes & 00000100)
+    {
+        std::cout << "front" << std::endl;
+
+    }
+    // BACK
+    else if (outputCodes & 01000000)
+    {
+        std::cout << "back" << std::endl;
+
+    }
+
+    return count;
 }
 
 void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
@@ -411,46 +494,76 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
     Varying varying[3];
 
     // Local space (v3) -> Clip space (v4)
-    float4 clipCoords[3]
+    float4 clipCoords[3] =
     {
         vertexShader(vertices[0], renderer->uniform, varying[0]),
         vertexShader(vertices[1], renderer->uniform, varying[1]),
         vertexShader(vertices[2], renderer->uniform, varying[2]),
     };
 
-    // TODO: Subdivide in others triangles
-    if (!isInside(clipCoords[0]) || !isInside(clipCoords[1]) || !isInside(clipCoords[2]))
-        return;
+    int pointCount = 3;
+    clipPoint outputPoints[9] =
+    {
+        { clipCoords[0], { 1.f, 0.f, 0.f } },
+        { clipCoords[1], { 0.f, 1.f, 0.f } },
+        { clipCoords[2], { 0.f, 0.f, 1.f } }
+    };
 
-    float3 invertedW(1.f / clipCoords[0].w, 1.f / clipCoords[1].w, 1.f / clipCoords[2].w);
+    // TODO: Subdivide in others triangles
+   /* if (!isInside(clipCoords[0]) || !isInside(clipCoords[1]) || !isInside(clipCoords[2]))
+        return;*/
+
+    unsigned char outputCodes[3] = { 0 };
+    for (int i = 0; i < 3; i++)
+        outputCodes[i] = computeClipOutcodes(clipCoords[i]);
+
+    // Exit if all vertices are outside the screen
+    if (outputCodes[0] & outputCodes[1] & outputCodes[2])
+        return; 
+    
+    pointCount = clipTriangle(outputPoints, outputCodes[0] | outputCodes[1] | outputCodes[2]);
+
+    if (pointCount == 0) // There is no vertice in the screen
+        return;
 
     // Clip space (v4) to NDC (v3)
-    float3 ndcCoords[3] = {
-        { clipCoords[0].xyz * invertedW.e[0] },
-        { clipCoords[1].xyz * invertedW.e[1] },
-        { clipCoords[2].xyz * invertedW.e[2] },
-    };
+    float3 ndcCoords[9];
+    for (int i = 0; i < pointCount; i++)
+        ndcCoords[i] = outputPoints[i].coords.xyz / outputPoints[i].coords.w;
 
-    if (faceCulling(ndcCoords, renderer->uniform.faceToCull))
-        return;
+    // Back face culling
+    for (int index0 = 0, index1 = 1, index2 = 2; index2 < pointCount; index1++, index2++)
+    {
+        const float3 ndcToCull[3] = { ndcCoords[index0], ndcCoords[index1], ndcCoords[index2] };
+        if (faceCulling(ndcToCull, renderer->uniform.faceToCull))
+            return;
+    }
 
     // NDC (v3) to screen coords (v2)
-    float4 screenCoords[3] = {
-        { ndcToScreenCoords(ndcCoords[0], renderer->viewport), invertedW.e[0] },
-        { ndcToScreenCoords(ndcCoords[1], renderer->viewport), invertedW.e[1] },
-        { ndcToScreenCoords(ndcCoords[2], renderer->viewport), invertedW.e[2] },
-    };
+    float4 screenCoords[9];
+    for (int i = 0; i < pointCount; i++)
+        screenCoords[i] = { ndcToScreenCoords(ndcCoords[i], renderer->viewport), 1.f / clipCoords[i].w };
+
+    Varying clippedVaryings[9];
+    for (int i = 0; i < pointCount; i++)
+        clippedVaryings[i] = interpolateVarying(varying, outputPoints[i].weights);
 
     // Rasterize triangle
-    if (renderer->uniform.fillTriangle)
-        rasterTriangle(renderer->fb, screenCoords, varying, renderer->uniform);
-
-    // Draw triangle wireframe
-    if (renderer->uniform.wireframeMode)
+    for (int index0 = 0, index1 = 1, index2 = 2; index2 < pointCount; index1++, index2++)
     {
-        drawLine(renderer->fb, screenCoords[0].xyz, screenCoords[1].xyz, renderer->lineColor);
-        drawLine(renderer->fb, screenCoords[1].xyz, screenCoords[2].xyz, renderer->lineColor);
-        drawLine(renderer->fb, screenCoords[2].xyz, screenCoords[0].xyz, renderer->lineColor);
+        float4 pointCoords[3] = { screenCoords[index0], screenCoords[index1], screenCoords[index2] };
+
+        if (renderer->uniform.fillTriangle)
+        {
+            Varying varyings[3] = { clippedVaryings[index0], clippedVaryings[index1], clippedVaryings[index2] };
+            rasterTriangle(renderer->fb, pointCoords, varyings, renderer->uniform);
+        }
+        if (renderer->uniform.wireframeMode)
+        {
+            drawLine(renderer->fb, pointCoords[index0].xyz, pointCoords[index1].xyz, renderer->lineColor);
+            drawLine(renderer->fb, pointCoords[index1].xyz, pointCoords[index2].xyz, renderer->lineColor);
+            drawLine(renderer->fb, pointCoords[index2].xyz, pointCoords[index0].xyz, renderer->lineColor);
+        }
     }
 }
 

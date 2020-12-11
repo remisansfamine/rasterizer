@@ -39,7 +39,7 @@ struct Object
         : position(pos), rotation(rot), scale(scale) {}
 
     // Return the object model with his transform
-    mat4x4 getModel() const { return mat4::rotateX(rotation.x) * mat4::rotateY(rotation.y) * mat4::translate(position) * mat4::scale(scale); }
+    mat4x4 getModel() const { return mat4::rotateX(rotation.x) * mat4::rotateY(rotation.y) * mat4::rotateZ(rotation.z) * mat4::translate(position) * mat4::scale(scale); }
 };
 
 struct Light
@@ -83,7 +83,7 @@ struct scnImpl
         20.f
     };
 
-    std::vector<Material> materials;
+    std::vector<Material> materials = { defaultMaterial };
     Light lights[8];
 
     float3 cameraPos = { 0.f, 0.f, 0.f };
