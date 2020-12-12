@@ -264,18 +264,18 @@ scnImpl::scnImpl()
     Object obj2({ 0.f, 0.f, -2.f }, { 0.f, M_PI, 0.f });
     //loadQuad(obj2, &textures, "assets/Deathclaw.png");
     //if (loadObject(obj2.vertices, "assets/sphere.obj", "assets", 0.5f))
-    objects.push_back(obj2);
+    //objects.push_back(obj2);
     
     Object obj3;
     loadObject(obj3, textures, materials, "assets/Stone.obj", "assets/", 0.1f);
-    objects.push_back(obj3);
+    //objects.push_back(obj3);
 
     Object obj4;
     obj4.isEnable = false;
     //loadObject(obj4.faces, textures, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
     loadObject(obj4, textures, materials, "assets/sphere.obj", "assets/");
     //loadObject(obj4.faces, textures, "assets/suzanne.obj", "assets/");
-    objects.push_back(obj4);
+    //objects.push_back(obj4);
 }
 
 scnImpl::~scnImpl()

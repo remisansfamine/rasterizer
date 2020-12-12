@@ -419,74 +419,93 @@ bool faceCulling(const float3 ndcCoords[3], FaceType type)
 unsigned char computeClipOutcodes(const float4 clipCoords)
 {
     unsigned char code = 0;
-    unsigned char plane = 0;
 
-    for (int i = 0; i < 8; i++)
+    for (int i = 0, plane = 1; i < 8; ++i, plane = 1 << i)
     {
-        plane = 1 << i;
-        
-        if ((i < 4  && clipCoords.e[i] > clipCoords.w) ||
-            (i >= 4 && clipCoords.e[i - 4] < -clipCoords.w))
-            code |= plane;
+        if (i < 4 && clipCoords.e[i] > clipCoords.w ||
+            i >= 4 && clipCoords.e[i % 4] < -clipCoords.w)
+                code |= plane;
     }
 
     return code;
 }
 
-int clipTriangle(clipPoint* outputCoords, unsigned char outputCodes)
+int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
 {
     if (!outputCodes)
         return 3;
 
-    int count = 0;
+    //Axis (x, y, z) on W-axis
+    int currIndex = 0;
 
-    // RIGHT
-    if (outputCodes & 00000001)
+    clipPoint* currentVertice = &outputCoords[currIndex];
+    clipPoint* previousVertice = &outputCoords[3 - 1];
+
+    //unsigned char in_numVertices = 0;
+    int in_numVertices = 0;
+    clipPoint in_vertices[9];
+
+    char previousDot;
+    char currentDot;
+
+    float intersectionFactor;
+    clipPoint intersectionPoint;
+
+    //Clip against first plane
+    //previousVertice = &face->hs_vertices[face->hs_numVertices-1];
+    for (int i = 0, plane = 1; i < 3; ++i, plane = 1 << i)
     {
-        std::cout << "right" << std::endl;
+        int index = i;
+        //int index = i < 4 ? i : i - 4;
+
+        //if (i < 4)
+        previousDot = (previousVertice->coords.e[index] <= previousVertice->coords.w) ? 1 : -1;
+        /*else if (i >= 4)
+            previousDot = (-previousVertice->e[index] <= previousVertice->w) ? 1 : -1;*/
+
+        //currentVertice = &face->hs_vertices[0];
+        while (currentVertice != &outputCoords[8])
+        {
+           // if (i < 4)
+                currentDot = (currentVertice->coords.e[index] <= currentVertice->coords.w) ? 1 : -1;
+            //else if (i >= 4)
+             //   currentDot = (-currentVertice->e[index] <= currentVertice->w) ? 1 : -1;
+
+            if (previousDot * currentDot < 0)
+            {
+                //Need to clip against plan w=0
+                intersectionFactor =
+                    (previousVertice->coords.w - previousVertice->coords.e[index]) /
+                    ((previousVertice->coords.w - previousVertice->coords.e[index]) - (currentVertice->coords.w - currentVertice->coords.e[index]));
+
+                intersectionPoint.coords = lerp(currentVertice->coords, previousVertice->coords, intersectionFactor);
+                intersectionPoint.weights = lerp(currentVertice->weights, previousVertice->weights, intersectionFactor);
+
+                // Insert
+                in_vertices[in_numVertices] = intersectionPoint;
+                in_numVertices++;
+            }
+
+            if (currentDot > 0)
+            {
+                //Insert
+                in_vertices[in_numVertices] = *currentVertice;
+                in_numVertices++;
+            }
+
+            previousDot = currentDot;
+
+            //Move forward
+            previousVertice = currentVertice;
+            currentVertice = &outputCoords[++currIndex];
+        }
+
+        for (int i = 0; i < in_numVertices; i++)
+            outputCoords[i] = in_vertices[i];
     }
-    // LEFT
-    if (outputCodes & 00010000)
-    {
-        std::cout << "left" << std::endl;
 
-    }
-
-    if (00010000)
-    {
-        std::bitset<8> b1(outputCodes);
-        std::bitset<8> b2(outputCodes & 00010000);
-        std::cout << "b1 = " << b1 << std::endl;
-        std::cout << "b2 = " << b2 << std::endl;
-    }
-
-    // TOP
-    if (outputCodes & 00000010)
-    {
-        std::cout << "up" << std::endl;
-
-    }
-    // BOTTOM
-    if (outputCodes & 00100000)
-    {
-        std::cout << "down" << std::endl;
-
-    }
-
-    // FRONT
-    if (outputCodes & 00000100)
-    {
-        std::cout << "front" << std::endl;
-
-    }
-    // BACK
-    else if (outputCodes & 01000000)
-    {
-        std::cout << "back" << std::endl;
-
-    }
-
-    return count;
+    // Should return in_numVertices
+    return 0;
 }
 
 void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
@@ -513,7 +532,7 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
    /* if (!isInside(clipCoords[0]) || !isInside(clipCoords[1]) || !isInside(clipCoords[2]))
         return;*/
 
-    unsigned char outputCodes[3] = { 0 };
+    unsigned char outputCodes[3];
     for (int i = 0; i < 3; i++)
         outputCodes[i] = computeClipOutcodes(clipCoords[i]);
 
