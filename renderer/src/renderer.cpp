@@ -136,14 +136,6 @@ void drawLine(const Framebuffer& fb, const float3& p0, const float3& p1, const f
     drawLine(fb.colorBuffer, fb.width, fb.height, (int)roundf(p0.x), (int)roundf(p0.y), (int)roundf(p1.x), (int)roundf(p1.y), color);
 }
 
-bool isInside(const float4& clip)
-{
-    return (clip.x > -clip.w && clip.x < clip.w)
-        && (clip.y > -clip.w && clip.y < clip.w)
-        && (clip.z > -clip.w && clip.z < clip.w)
-        && 0 < clip.w;
-}
-
 float3 ndcToScreenCoords(const float3& ndc, const Viewport& viewport)
 {
     return
@@ -161,6 +153,8 @@ float getWeight(const float2& a, const float2& b, const float2& c)
 
 void getLightColor(const Uniform& uniform, Varying& varying)
 {
+    float4 ambientColorSum = { 0.f, 0.f, 0.f, 0.f };
+    float4 diffuseColorSum = { 0.f, 0.f, 0.f, 0.f };
     for (int i = 0; i < IM_ARRAYSIZE(uniform.lights); i++)
     {
         if (!uniform.lights[i].isEnable)
@@ -185,10 +179,10 @@ void getLightColor(const Uniform& uniform, Varying& varying)
             currLight.quadraticAttenuation * distance * distance;
 
         // Ambient
-        varying.ambientColor += currLight.ambient;
+        ambientColorSum += currLight.ambient;
 
         // Diffuse
-        varying.diffuseColor += std::max(0.f, NdotL) * currLight.diffuse / attenuation;
+        diffuseColorSum += std::max(0.f, NdotL) * currLight.diffuse / attenuation;
 
         // Specular
         float3 R = normalized(2.f * NdotL * normal - lightDir);
@@ -197,7 +191,11 @@ void getLightColor(const Uniform& uniform, Varying& varying)
         varying.specularColor += powf(std::max(0.f, dot(R, V)), uniform.material.shininess) * currLight.specular / attenuation;
     }
 
-    varying.diffuseColor.a = varying.specularColor.a = 0.f;
+    ambientColorSum.a = diffuseColorSum.a = 0.f;
+
+    varying.shadedColor = uniform.material.ambientColor * (uniform.globalAmbient + ambientColorSum) +
+                          uniform.material.diffuseColor * diffuseColorSum +
+                          uniform.material.emissionColor;
 }
 
 float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
@@ -215,7 +213,7 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
     float4 texColor;
     if (uniform.textureFilter == FilterType::BILINEAR)
     {
-        float s = (texture.width  - 1.f) * u;
+        float s = (texture.width - 1.f) * u;
         float t = (texture.height - 1.f) * v;
 
         int si = int(s), ti = int(t);
@@ -253,21 +251,19 @@ float4 gammaCorrection(const float4& color, float iGamma)
     };
 }
 
-float4 fragmentShader(Varying& fragVars, const Uniform& uniform)
+bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
 {
     if (!uniform.lighting)
-        return getTextureColor(fragVars, uniform) * fragVars.color;
+        outColor = getTextureColor(fragVars, uniform) * fragVars.color;
 
     if (uniform.phongModel)
         getLightColor(uniform, fragVars);
 
-    float4 color = getTextureColor(fragVars, uniform) * fragVars.color *
-                   (uniform.material.ambientColor * (uniform.globalAmbient + fragVars.ambientColor) +
-                   uniform.material.diffuseColor * fragVars.diffuseColor +
-                   uniform.material.emissionColor) +
-                   uniform.material.specularColor * fragVars.specularColor;
+    outColor = getTextureColor(fragVars, uniform) * fragVars.color *
+        (fragVars.shadedColor) +
+        uniform.material.specularColor * fragVars.specularColor;
 
-    return color;
+    return true;
 }
 
 float interpolateFloat(const float3& value, const float3& weight)
@@ -368,7 +364,9 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
 
             Varying fragVarying = interpolateVarying(varying, weight);
 
-            float4 fragColor = fragmentShader(fragVarying, uniform);
+            float4 fragColor;
+            if (!fragmentShader(fragVarying, uniform, fragColor))
+                continue;
 
             // Cutout && depth test on
             if (zBuffer && alphaTest(uniform, fragColor.a))
@@ -420,14 +418,22 @@ unsigned char computeClipOutcodes(const float4 clipCoords)
 {
     unsigned char code = 0;
 
-    for (int i = 0, plane = 1; i < 8; ++i, plane = 1 << i)
+    for (int i = 0, plane = 1; i < 8; ++i, plane <<= 1)
     {
         if (i < 4 && clipCoords.e[i] > clipCoords.w ||
             i >= 4 && clipCoords.e[i % 4] < -clipCoords.w)
-                code |= plane;
+            code |= plane;
     }
 
     return code;
+}
+
+bool isInside(const float4& clip)
+{
+    return (clip.x > -clip.w && clip.x < clip.w)
+        && (clip.y > -clip.w && clip.y < clip.w)
+        && (clip.z > -clip.w && clip.z < clip.w)
+        && 0 < clip.w;
 }
 
 int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
@@ -435,77 +441,74 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
     if (!outputCodes)
         return 3;
 
-    //Axis (x, y, z) on W-axis
-    int currIndex = 0;
-
-    clipPoint* currentVertice = &outputCoords[currIndex];
-    clipPoint* previousVertice = &outputCoords[3 - 1];
-
-    //unsigned char in_numVertices = 0;
-    int in_numVertices = 0;
-    clipPoint in_vertices[9];
-
-    char previousDot;
-    char currentDot;
-
-    float intersectionFactor;
-    clipPoint intersectionPoint;
+    int finalPointCount = 3;
 
     //Clip against first plane
-    //previousVertice = &face->hs_vertices[face->hs_numVertices-1];
-    for (int i = 0, plane = 1; i < 3; ++i, plane = 1 << i)
+    for (int i = 0, plane = 1; i < 8; ++i, plane <<= 1)
     {
-        int index = i;
-        //int index = i < 4 ? i : i - 4;
+        int in_numVertices = 0;
+        int currIndex = 0;
 
-        //if (i < 4)
-        previousDot = (previousVertice->coords.e[index] <= previousVertice->coords.w) ? 1 : -1;
-        /*else if (i >= 4)
-            previousDot = (-previousVertice->e[index] <= previousVertice->w) ? 1 : -1;*/
+        clipPoint* currentVertex = &outputCoords[0];
+        clipPoint* previousVertex = &outputCoords[finalPointCount - 1];
+
+        clipPoint in_vertices[9];
+
+        unsigned char currCode;
+        unsigned char prevCode = computeClipOutcodes(previousVertex->coords);
+
+        float lerpFactor;
+        clipPoint intersectionPoint;
+
+        int index = i % 4;
 
         //currentVertice = &face->hs_vertices[0];
-        while (currentVertice != &outputCoords[8])
+        while (currentVertex != &outputCoords[finalPointCount])
         {
-           // if (i < 4)
-                currentDot = (currentVertice->coords.e[index] <= currentVertice->coords.w) ? 1 : -1;
-            //else if (i >= 4)
-             //   currentDot = (-currentVertice->e[index] <= currentVertice->w) ? 1 : -1;
+            currCode = computeClipOutcodes(currentVertex->coords);
 
-            if (previousDot * currentDot < 0)
+            if ((currCode ^ prevCode) & plane)
             {
                 //Need to clip against plan w=0
-                intersectionFactor =
-                    (previousVertice->coords.w - previousVertice->coords.e[index]) /
-                    ((previousVertice->coords.w - previousVertice->coords.e[index]) - (currentVertice->coords.w - currentVertice->coords.e[index]));
+                if (i < 3)
+                {
+                    lerpFactor =
+                        (previousVertex->coords.w - previousVertex->coords.e[index]) /
+                        ((previousVertex->coords.w - previousVertex->coords.e[index]) - (currentVertex->coords.w - currentVertex->coords.e[index]));
+                }
+                else if (i >= 4 && i < 7)
+                {
+                    lerpFactor =
+                        (previousVertex->coords.w + previousVertex->coords.e[index]) /
+                        ((previousVertex->coords.w + previousVertex->coords.e[index]) - (currentVertex->coords.w + currentVertex->coords.e[index]));
+                }
+                else
+                    lerpFactor = previousVertex->coords.w / (previousVertex->coords.w - currentVertex->coords.w);
 
-                intersectionPoint.coords = lerp(currentVertice->coords, previousVertice->coords, intersectionFactor);
-                intersectionPoint.weights = lerp(currentVertice->weights, previousVertice->weights, intersectionFactor);
+                intersectionPoint.coords  = lerp(previousVertex->coords,  currentVertex->coords,  lerpFactor);
+                intersectionPoint.weights = lerp(previousVertex->weights, currentVertex->weights, lerpFactor);
 
                 // Insert
                 in_vertices[in_numVertices] = intersectionPoint;
                 in_numVertices++;
             }
 
-            if (currentDot > 0)
-            {
-                //Insert
-                in_vertices[in_numVertices] = *currentVertice;
-                in_numVertices++;
-            }
+            //Insert current if it is in the screen
+            if (!(currCode & plane))
+                in_vertices[in_numVertices++] = *currentVertex;
 
-            previousDot = currentDot;
+            prevCode = currCode;
 
-            //Move forward
-            previousVertice = currentVertice;
-            currentVertice = &outputCoords[++currIndex];
+            //Move forward (set previous vertex and get next vertex)
+            previousVertex = currentVertex++;
         }
 
-        for (int i = 0; i < in_numVertices; i++)
-            outputCoords[i] = in_vertices[i];
+        memcpy(outputCoords, in_vertices, sizeof(clipPoint) * in_numVertices);
+        finalPointCount = in_numVertices;
     }
 
     // Should return in_numVertices
-    return 0;
+    return finalPointCount;
 }
 
 void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
@@ -520,7 +523,6 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
         vertexShader(vertices[2], renderer->uniform, varying[2]),
     };
 
-    int pointCount = 3;
     clipPoint outputPoints[9] =
     {
         { clipCoords[0], { 1.f, 0.f, 0.f } },
@@ -528,21 +530,17 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
         { clipCoords[2], { 0.f, 0.f, 1.f } }
     };
 
-    // TODO: Subdivide in others triangles
-   /* if (!isInside(clipCoords[0]) || !isInside(clipCoords[1]) || !isInside(clipCoords[2]))
-        return;*/
-
     unsigned char outputCodes[3];
     for (int i = 0; i < 3; i++)
         outputCodes[i] = computeClipOutcodes(clipCoords[i]);
 
     // Exit if all vertices are outside the screen
     if (outputCodes[0] & outputCodes[1] & outputCodes[2])
-        return; 
-    
-    pointCount = clipTriangle(outputPoints, outputCodes[0] | outputCodes[1] | outputCodes[2]);
+        return;
 
-    if (pointCount == 0) // There is no vertice in the screen
+    int pointCount = clipTriangle(outputPoints, outputCodes[0] | outputCodes[1] | outputCodes[2]);
+
+    if (pointCount == 0) // Exit if there is no vertice in the screen
         return;
 
     // Clip space (v4) to NDC (v3)
@@ -558,14 +556,16 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
             return;
     }
 
-    // NDC (v3) to screen coords (v2)
     float4 screenCoords[9];
-    for (int i = 0; i < pointCount; i++)
-        screenCoords[i] = { ndcToScreenCoords(ndcCoords[i], renderer->viewport), 1.f / clipCoords[i].w };
-
     Varying clippedVaryings[9];
     for (int i = 0; i < pointCount; i++)
+    {
+        // NDC (v3) to screen coords (v2)
+        screenCoords[i] = { ndcToScreenCoords(ndcCoords[i], renderer->viewport), 1.f / outputPoints[i].coords.w };
+
+        // Get new varyings after clipping
         clippedVaryings[i] = interpolateVarying(varying, outputPoints[i].weights);
+    }
 
     // Rasterize triangle
     for (int index0 = 0, index1 = 1, index2 = 2; index2 < pointCount; index1++, index2++)
@@ -577,11 +577,11 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
             Varying varyings[3] = { clippedVaryings[index0], clippedVaryings[index1], clippedVaryings[index2] };
             rasterTriangle(renderer->fb, pointCoords, varyings, renderer->uniform);
         }
+
         if (renderer->uniform.wireframeMode)
         {
-            drawLine(renderer->fb, pointCoords[index0].xyz, pointCoords[index1].xyz, renderer->lineColor);
-            drawLine(renderer->fb, pointCoords[index1].xyz, pointCoords[index2].xyz, renderer->lineColor);
-            drawLine(renderer->fb, pointCoords[index2].xyz, pointCoords[index0].xyz, renderer->lineColor);
+            for (int i = 0; i < 3; i++)
+                drawLine(renderer->fb, pointCoords[i].xyz, pointCoords[(i + 1) % 3].xyz, renderer->lineColor);
         }
     }
 }

@@ -90,8 +90,7 @@ struct Varying
     float4 color;
     float2 uv;
 
-    float4 ambientColor  =  { 0.f, 0.f, 0.f, 0.f };
-    float4 diffuseColor  = { 0.f, 0.f, 0.f, 0.f };
+    float4 shadedColor = { 0.f, 0.f, 0.f, 0.f };
     float4 specularColor = { 0.f, 0.f, 0.f, 0.f };
 };
 

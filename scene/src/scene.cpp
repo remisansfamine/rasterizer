@@ -21,7 +21,7 @@ int loadTexture(std::vector<Texture>& textures, const char* filePath)
     std::vector<Texture>::iterator it = std::find_if(textures.begin(), textures.end(),
                                         [filePath](Texture& t)
                                         { return t.fileName.compare(filePath) == 0; });
-
+    
     if (it != textures.end())
         return it - textures.begin();
 
@@ -103,7 +103,7 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
     {
         Mesh mesh;
         mesh.textureIndex = -1;
-        mesh.materialIndex = -1;
+        mesh.materialIndex = 0;
         object.mesh.push_back(mesh);
     }
 
@@ -267,13 +267,12 @@ scnImpl::scnImpl()
     //objects.push_back(obj2);
     
     Object obj3;
-    loadObject(obj3, textures, materials, "assets/Stone.obj", "assets/", 0.1f);
-    //objects.push_back(obj3);
+    loadObject(obj3, textures, materials, "assets/deathclaw.obj", "assets/");
+    objects.push_back(obj3);
 
     Object obj4;
-    obj4.isEnable = false;
-    //loadObject(obj4.faces, textures, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
-    loadObject(obj4, textures, materials, "assets/sphere.obj", "assets/");
+    //loadObject(obj4, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
+    //loadObject(obj4, textures, materials, "assets/sphere.obj", "assets/");
     //loadObject(obj4.faces, textures, "assets/suzanne.obj", "assets/");
     //objects.push_back(obj4);
 }

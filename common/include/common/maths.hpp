@@ -307,7 +307,7 @@ inline float saturate(float value)
 
 inline float mod(float value, float dividend)
 {
-    float result = fmod(value, dividend);
+    float result = fmodf(value, dividend);
     return (result < 0) ? result + dividend : result;
 }
 
