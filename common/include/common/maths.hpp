@@ -300,15 +300,45 @@ inline float remap(float value, float oldMin, float oldMax, float newMin, float 
     return (value - oldMin) * (newMax - newMin) / (newMin - oldMin) + newMin;
 }
 
-inline float saturate(float value)
+inline double wrapValue(float value, float max)
 {
-    return std::clamp(value, 0.f, 1.f);
+    return value - max * floorf(value / max);
 }
 
-inline float mod(float value, float dividend)
+inline float trueMod(float value, float dividend)
 {
     float result = fmodf(value, dividend);
-    return (result < 0) ? result + dividend : result;
+    return result < 0.f ? result + dividend : result;
+}
+
+template <typename T>
+inline int sign(T value)
+{
+    return (T(0) < value) - (value < T(0));
+}
+
+template<typename T>
+inline T min(T value0, T value1)
+{
+    return value0 < value1 ? value0 : value1;
+}
+
+template<typename T>
+inline T max(T value0, T value1)
+{
+    return value0 < value1 ? value1 : value0;
+}
+
+template<typename T>
+inline T clamp(float value, T min, T max)
+{
+    return min(max(value, min), max);
+}
+
+template<typename T>
+inline T saturate(T value)
+{
+    return clamp(value, T(0), T(1));
 }
 
 template<typename T>

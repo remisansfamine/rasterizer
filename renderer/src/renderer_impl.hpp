@@ -4,6 +4,12 @@
 
 #include <common/types.hpp>
 
+enum class FaceOrientation
+{
+    CLOCK_WISE,
+    COUNTER_CLOCK_WISE
+};
+
 enum class FaceType
 {
     NONE,
@@ -73,7 +79,9 @@ struct Uniform
 
     bool depthTest = true;
     bool stencilTest = false;
+    bool blending = true;
     bool wireframeMode = false;
+    FaceOrientation faceOrientation = FaceOrientation::CLOCK_WISE;
     FaceType faceToCull = FaceType::BACK;
     FilterType textureFilter = FilterType::NEAREST;
     bool lighting = true;

@@ -95,6 +95,8 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
 
             Mesh mesh;
             mesh.textureIndex = loadTexture(scnTextures, (mtlBasedir + mat.diffuse_texname).c_str());
+            if (mesh.textureIndex == -1)
+                std::cout << mtlBasedir + mat.diffuse_texname << std::endl;
             mesh.materialIndex = loadMaterial(scnMaterials, mat.ambient, mat.diffuse, mat.specular, mat.emission, mat.shininess);
             object.mesh.push_back(mesh);
         }
@@ -267,14 +269,14 @@ scnImpl::scnImpl()
     //objects.push_back(obj2);
     
     Object obj3;
-    loadObject(obj3, textures, materials, "assets/deathclaw.obj", "assets/");
+    //loadObject(obj3, textures, materials, "assets/deathclaw.obj", "assets/", 0.5f);
     objects.push_back(obj3);
 
     Object obj4;
-    //loadObject(obj4, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
+    loadObject(obj4, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
     //loadObject(obj4, textures, materials, "assets/sphere.obj", "assets/");
     //loadObject(obj4.faces, textures, "assets/suzanne.obj", "assets/");
-    //objects.push_back(obj4);
+    objects.push_back(obj4);
 }
 
 scnImpl::~scnImpl()
@@ -295,7 +297,7 @@ void editLights(rdrImpl* renderer, scnImpl* scene)
         ImGui::SliderInt("Selected light", &selectedLight, 0, IM_ARRAYSIZE(scene->lights) - 1);
         ImGui::Checkbox("Is light enable", &scene->lights[selectedLight].isEnable);
 
-        ImGui::SliderFloat4("Light position", scene->lights[selectedLight].lightPos.e, -10.f, 10.f);
+        ImGui::SliderFloat4("Light position", scene->lights[selectedLight].lightPos.e, -20.f, 20.f);
 
         bool isPoint = scene->lights[selectedLight].lightPos.w == 1.f;
         if (ImGui::Checkbox("Is point light", (bool*)&isPoint));
