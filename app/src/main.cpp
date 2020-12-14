@@ -192,10 +192,8 @@ int main(int argc, char* argv[])
         rdrSetUniformFloatV(renderer, UT_DELTATIME, &deltaTime);
         rdrSetUniformFloatV(renderer, UT_TIME, &time);
 
-        mat4x4 projection = camera.getProjection();
-        mat4x4 view       = camera.getViewMatrix();
-        rdrSetProjection(renderer, projection.e);
-        rdrSetView(renderer, view.e);
+        rdrSetProjection(renderer, camera.getProjection().e);
+        rdrSetView(renderer, camera.getViewMatrix().e);
 
         // Render scene
         scnSetCameraPosition(scene, camera.position.e);

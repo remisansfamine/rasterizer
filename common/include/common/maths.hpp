@@ -123,7 +123,7 @@ inline float4 operator/(const float4& v, float scale)
     return scale == 0.f ? v : float4{ v.x / scale, v.y / scale, v.z / scale, v.w / scale };
 }
 
-inline float4& operator/(float4& v, float scale)
+inline float4& operator/=(float4& v, float scale)
 {
     v = v / scale;
     return v;
@@ -300,7 +300,12 @@ inline float remap(float value, float oldMin, float oldMax, float newMin, float 
     return (value - oldMin) * (newMax - newMin) / (newMin - oldMin) + newMin;
 }
 
-inline double wrapValue(float value, float max)
+inline float fract(float value)
+{
+    return value - floor(value);
+}
+
+inline float wrapValue(float value, float max)
 {
     return value - max * floorf(value / max);
 }

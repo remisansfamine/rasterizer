@@ -6,8 +6,8 @@
 
 enum class FaceOrientation
 {
-    CLOCK_WISE,
-    COUNTER_CLOCK_WISE
+    CW,
+    CCW
 };
 
 enum class FaceType
@@ -66,29 +66,26 @@ struct Uniform
     Material material;
 
     float3 cameraPos;
+
     mat4x4 viewProj;
-    mat4x4 mvp;
     mat4x4 model;
     mat4x4 view;
     mat4x4 projection;
 
-    float gamma = 2.2f;
-    float iGamma = 1.f / 2.2f;
-
-    float cutout = 0.f;
-
     bool depthTest = true;
     bool stencilTest = false;
+
     bool blending = true;
-    bool wireframeMode = false;
-    FaceOrientation faceOrientation = FaceOrientation::CLOCK_WISE;
+    float cutout = 0.5f;
+
+    FaceOrientation faceOrientation = FaceOrientation::CW;
     FaceType faceToCull = FaceType::BACK;
+
     FilterType textureFilter = FilterType::NEAREST;
+
     bool lighting = true;
     bool phongModel = false;
     bool perspectiveCorrection = true;
-    bool wMode = true;
-    bool fillTriangle = true;
 };
 
 struct Varying
@@ -124,6 +121,14 @@ struct rdrImpl
     Viewport viewport;
 
     float4 lineColor = { 1.f, 1.f, 1.f, 1.f };
+
+    bool fillTriangle = true;
+    bool wireframeMode = false;
+    bool boxBlur = false;
+    bool gaussianBlur = false;
+
+    float gamma = 2.2f;
+    float iGamma = 1.f / 2.2f;
 
     Uniform uniform;
 };
