@@ -33,7 +33,9 @@ Ks 0.000000 0.000000 0.000000
 Ni 1.000000
 d 0.000000
 illum 2
-
+map_Kd textures/sponza_details_diff.tga
+map_Ka textures/sponza_details_diff.tga
+map_Disp textures/sponza_details_ddn.tga
 
 newmtl Material__57
 Ns 7.843137

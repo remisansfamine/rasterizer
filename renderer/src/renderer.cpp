@@ -11,8 +11,8 @@
 
 #include <algorithm>
 
-#include <iostream>
 #include <bitset>
+#include <iostream>
 
 struct clipPoint
 {
@@ -34,6 +34,11 @@ rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int he
     return renderer;
 }
 
+void rdrFinish(rdrImpl* renderer)
+{
+
+}
+
 void rdrShutdown(rdrImpl* renderer)
 {
     delete renderer;
@@ -43,12 +48,12 @@ void rdrSetUniformFloatV(rdrImpl* renderer, rdrUniformType type, float* value)
 {
     switch (type)
     {
-    case UT_TIME:      renderer->uniform.time = value[0]; break;
-    case UT_DELTATIME: renderer->uniform.deltaTime = value[0]; break;
-    case UT_CAMERA_POS: renderer->uniform.cameraPos = float3{ value[0], value[1], value[2] }; break;
-    case UT_GLOBALAMBIENT:  renderer->uniform.globalAmbient = float4{ value[0], value[1], value[2], value[3] }; break;
-    case UT_GLOBALCOLOR:    renderer->uniform.globalColor = float4{ value[0], value[1], value[2], value[3] }; break;
-    default:;
+        case UT_TIME:      renderer->uniform.time = value[0]; break;
+        case UT_DELTATIME: renderer->uniform.deltaTime = value[0]; break;
+        case UT_CAMERA_POS: renderer->uniform.cameraPos = float3{ value[0], value[1], value[2] }; break;
+        case UT_GLOBALAMBIENT:  renderer->uniform.globalAmbient = float4{ value[0], value[1], value[2], value[3] }; break;
+        case UT_GLOBALCOLOR:    renderer->uniform.globalColor = float4{ value[0], value[1], value[2], value[3] }; break;
+        default:;
     }
 }
 
@@ -56,9 +61,9 @@ void rdrSetUniformBool(rdrImpl* renderer, rdrUniformType type, bool value)
 {
     switch (type)
     {
-    case UT_DEPTHTEST:      renderer->uniform.depthTest = value; break;
-    case UT_STENCTILTEST:   renderer->uniform.stencilTest = value; break;
-    default:;
+        case UT_DEPTHTEST:      renderer->uniform.depthTest = value; break;
+        case UT_STENCTILTEST:   renderer->uniform.stencilTest = value; break;
+        default:;
     }
 }
 
@@ -175,23 +180,23 @@ void getLightColor(const Uniform& uniform, Varying& varying)
         float NdotL = dot(lightDir, normal);
 
         float attenuation = currLight.constantAttenuation +
-            currLight.linearAttenuation * distance +
-            currLight.quadraticAttenuation * distance * distance;
+                            currLight.linearAttenuation * distance +
+                            currLight.quadraticAttenuation * distance * distance;
 
         // Ambient
         ambientColorSum += currLight.ambient;
 
         // Diffuse
-        diffuseColorSum += std::max(0.f, NdotL) * currLight.diffuse / attenuation;
+        diffuseColorSum += max(0.f, NdotL) * currLight.diffuse / attenuation;
 
         // Specular
         float3 R = normalized(2.f * NdotL * normal - lightDir);
         float3 V = normalized(uniform.cameraPos - varying.coords);
 
-        varying.specularColor += powf(std::max(0.f, dot(R, V)), uniform.material.shininess) * currLight.specular / attenuation;
+        varying.specularColor += powf(max(0.f, dot(R, V)), uniform.material.shininess) * currLight.specular / attenuation;
     }
 
-    ambientColorSum.a = diffuseColorSum.a = 0.f;
+    ambientColorSum.a = diffuseColorSum.a = varying.specularColor.a = 0.f;
 
     varying.shadedColor = uniform.material.ambientColor * (uniform.globalAmbient + ambientColorSum) +
                           uniform.material.diffuseColor * diffuseColorSum +
@@ -206,8 +211,8 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
     const rdrTexture& texture = uniform.texture;
 
     // Get tex coords with UVs
-    float u = mod(fragVars.uv.u, 1.f);
-    float v = mod(fragVars.uv.v, 1.f);
+    float u = wrapValue(fragVars.uv.u, 1.f);
+    float v = wrapValue(fragVars.uv.v, 1.f);
 
     // Get texel color with tex coords
     float4 texColor;
@@ -232,9 +237,10 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
     }
     else
     {
-        float s = texture.width * u;
-        float t = texture.height * v;
-        texColor = texture.data[int(t) * texture.width + int(s)];
+        int s = texture.width  * u;
+        int t = texture.height * v;
+
+        texColor = texture.data[t * texture.width + s];
     }
 
     return texColor;
@@ -254,14 +260,16 @@ float4 gammaCorrection(const float4& color, float iGamma)
 bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
 {
     if (!uniform.lighting)
+    {
         outColor = getTextureColor(fragVars, uniform) * fragVars.color;
+        return true;
+    }
 
     if (uniform.phongModel)
         getLightColor(uniform, fragVars);
 
-    outColor = getTextureColor(fragVars, uniform) * fragVars.color *
-        (fragVars.shadedColor) +
-        uniform.material.specularColor * fragVars.specularColor;
+    outColor = getTextureColor(fragVars, uniform) * fragVars.color * fragVars.shadedColor +
+            uniform.material.specularColor * fragVars.specularColor;
 
     return true;
 }
@@ -317,10 +325,10 @@ void perspectiveCorrection(const float3 correctionFloats, float3& weight)
 void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const Varying varying[3], const Uniform& uniform)
 {
     // Get the bounding box
-    int xMin = std::min(screenCoords[0].x, std::min(screenCoords[1].x, screenCoords[2].x));
-    int yMin = std::min(screenCoords[0].y, std::min(screenCoords[1].y, screenCoords[2].y));
-    int xMax = std::max(screenCoords[0].x, std::max(screenCoords[1].x, screenCoords[2].x));
-    int yMax = std::max(screenCoords[0].y, std::max(screenCoords[1].y, screenCoords[2].y));
+    int xMin = min(screenCoords[0].x, min(screenCoords[1].x, screenCoords[2].x));
+    int yMin = min(screenCoords[0].y, min(screenCoords[1].y, screenCoords[2].y));
+    int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
+    int yMax = max(screenCoords[0].y, max(screenCoords[1].y, screenCoords[2].y));
 
     float area = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
 
@@ -372,7 +380,10 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
             if (zBuffer && alphaTest(uniform, fragColor.a))
                 *zBuffer = z;
 
-            fb.colorBuffer[fbIndex] = gammaCorrection(fragColor * fragColor.a + fb.colorBuffer[fbIndex] * (1.f - fragColor.a), uniform.iGamma);
+            if (uniform.blending)
+                fragColor = fragColor * fragColor.a + fb.colorBuffer[fbIndex] * (1.f - fragColor.a);
+
+            fb.colorBuffer[fbIndex] = gammaCorrection(fragColor, uniform.iGamma);
         }
     }
 }
@@ -396,11 +407,18 @@ float4 vertexShader(const rdrVertex& vertex, const Uniform& uniform, Varying& va
     return uniform.viewProj * localCoords;
 }
 
-bool faceCulling(const float3 ndcCoords[3], FaceType type)
+bool faceCulling(const float3 ndcCoords[3], FaceOrientation orientation, FaceType toCull)
 {
-    float normalZ = ((ndcCoords[2] - ndcCoords[0]) ^ (ndcCoords[1] - ndcCoords[0])).z;
+    int index1 = 1, index2 = 2;
+    if (orientation == FaceOrientation::COUNTER_CLOCK_WISE)
+    {
+        index1 = 2;
+        index2 = 1;
+    }
 
-    switch (type)
+    float normalZ = ((ndcCoords[index2] - ndcCoords[0]) ^ (ndcCoords[index1] - ndcCoords[0])).z;
+
+    switch (toCull)
     {
         case FaceType::BACK: return normalZ > 0.f;
 
@@ -418,26 +436,19 @@ unsigned char computeClipOutcodes(const float4 clipCoords)
 {
     unsigned char code = 0;
 
-    for (int i = 0, plane = 1; i < 8; ++i, plane <<= 1)
+    for (int i = 0; i < 8; i++)
     {
-        if (i < 4 && clipCoords.e[i] > clipCoords.w ||
-            i >= 4 && clipCoords.e[i % 4] < -clipCoords.w)
-            code |= plane;
+        // Check for each coordinate if it is outside the plane, if it is change the outcode
+        if (sign(i - 3) * clipCoords.e[i % 4] <= -clipCoords.w)
+            code |= 1 << i;
     }
 
     return code;
 }
 
-bool isInside(const float4& clip)
-{
-    return (clip.x > -clip.w && clip.x < clip.w)
-        && (clip.y > -clip.w && clip.y < clip.w)
-        && (clip.z > -clip.w && clip.z < clip.w)
-        && 0 < clip.w;
-}
-
 int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
 {
+    // Fast exit if all points are in the screen
     if (!outputCodes)
         return 3;
 
@@ -446,68 +457,63 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
     //Clip against first plane
     for (int i = 0, plane = 1; i < 8; ++i, plane <<= 1)
     {
-        int in_numVertices = 0;
-        int currIndex = 0;
+        // If there is no point outside this plane, continue
+        if (!(outputCodes & plane))
+            continue;
 
-        clipPoint* currentVertex = &outputCoords[0];
+        int currentPointCount = 0;
+
+        clipPoint currentVertices[9];
+        clipPoint* currentVertex  = &outputCoords[0];
         clipPoint* previousVertex = &outputCoords[finalPointCount - 1];
 
-        clipPoint in_vertices[9];
+        // Get axis index
+        int axis = i < 4 ? i : i - 4;
 
-        unsigned char currCode;
-        unsigned char prevCode = computeClipOutcodes(previousVertex->coords);
+        // Get axis sign (-1, 0, 1)
+        int axisSign = sign(i - 3);
 
-        float lerpFactor;
-        clipPoint intersectionPoint;
+        unsigned char   prevCode = computeClipOutcodes(previousVertex->coords) & plane;
+        float           prevAxis = axisSign * previousVertex->coords.e[axis];
 
-        int index = i % 4;
-
-        //currentVertice = &face->hs_vertices[0];
         while (currentVertex != &outputCoords[finalPointCount])
         {
-            currCode = computeClipOutcodes(currentVertex->coords);
+            unsigned char   currCode = computeClipOutcodes(currentVertex->coords) & plane;
+            float           currAxis = axisSign * currentVertex->coords.e[axis];
 
-            if ((currCode ^ prevCode) & plane)
+            // Check if only one point is outside the plane
+            if (currCode ^ prevCode)
             {
-                //Need to clip against plan w=0
-                if (i < 3)
-                {
-                    lerpFactor =
-                        (previousVertex->coords.w - previousVertex->coords.e[index]) /
-                        ((previousVertex->coords.w - previousVertex->coords.e[index]) - (currentVertex->coords.w - currentVertex->coords.e[index]));
-                }
-                else if (i >= 4 && i < 7)
-                {
-                    lerpFactor =
-                        (previousVertex->coords.w + previousVertex->coords.e[index]) /
-                        ((previousVertex->coords.w + previousVertex->coords.e[index]) - (currentVertex->coords.w + currentVertex->coords.e[index]));
-                }
-                else
-                    lerpFactor = previousVertex->coords.w / (previousVertex->coords.w - currentVertex->coords.w);
+                clipPoint intersectionPoint;
 
+                // Get intersection factor with the current axes
+                float lerpFactor =
+                (previousVertex->coords.w + prevAxis) /
+                (previousVertex->coords.w + prevAxis - currentVertex->coords.w - currAxis);
+
+                // Lerp the values
                 intersectionPoint.coords  = lerp(previousVertex->coords,  currentVertex->coords,  lerpFactor);
                 intersectionPoint.weights = lerp(previousVertex->weights, currentVertex->weights, lerpFactor);
 
-                // Insert
-                in_vertices[in_numVertices] = intersectionPoint;
-                in_numVertices++;
+                // Insert intersection vertex at the end of the array
+                currentVertices[currentPointCount++] = intersectionPoint;
             }
 
-            //Insert current if it is in the screen
-            if (!(currCode & plane))
-                in_vertices[in_numVertices++] = *currentVertex;
+            //Insert current vertex at the end of the array, if it is inside the plane 
+            if (!currCode)
+                currentVertices[currentPointCount++] = *currentVertex;
 
             prevCode = currCode;
+            prevAxis = currAxis;
 
             //Move forward (set previous vertex and get next vertex)
             previousVertex = currentVertex++;
         }
 
-        memcpy(outputCoords, in_vertices, sizeof(clipPoint) * in_numVertices);
-        finalPointCount = in_numVertices;
+        memcpy(outputCoords, currentVertices, sizeof(clipPoint) * currentPointCount);
+        finalPointCount = currentPointCount;
     }
 
-    // Should return in_numVertices
     return finalPointCount;
 }
 
@@ -549,18 +555,14 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
         ndcCoords[i] = outputPoints[i].coords.xyz / outputPoints[i].coords.w;
 
     // Back face culling
-    for (int index0 = 0, index1 = 1, index2 = 2; index2 < pointCount; index1++, index2++)
-    {
-        const float3 ndcToCull[3] = { ndcCoords[index0], ndcCoords[index1], ndcCoords[index2] };
-        if (faceCulling(ndcToCull, renderer->uniform.faceToCull))
-            return;
-    }
+    if (faceCulling(ndcCoords, renderer->uniform.faceOrientation,renderer->uniform.faceToCull))
+        return;
 
     float4 screenCoords[9];
     Varying clippedVaryings[9];
     for (int i = 0; i < pointCount; i++)
     {
-        // NDC (v3) to screen coords (v2)
+        // NDC (v3) to screen coords (v2 + depth + clipCoord w)
         screenCoords[i] = { ndcToScreenCoords(ndcCoords[i], renderer->viewport), 1.f / outputPoints[i].coords.w };
 
         // Get new varyings after clipping
@@ -608,18 +610,33 @@ void rdrShowImGuiControls(rdrImpl* renderer)
 
     ImGui::Checkbox("Wireframe", &renderer->uniform.wireframeMode);
     ImGui::Checkbox("Depthtest", &renderer->uniform.depthTest);
+    ImGui::Checkbox("Blending", &renderer->uniform.blending);
     ImGui::Checkbox("Lighting", &renderer->uniform.lighting);
     ImGui::Checkbox("Phong model", &renderer->uniform.phongModel);
 
-    const char* filterTypeStr[] = { "NEAREST", "BILINEAR" };
-    int filterTypeIndex = (int)renderer->uniform.textureFilter;
-    if (ImGui::Combo("Texture filter", &filterTypeIndex, filterTypeStr, IM_ARRAYSIZE(filterTypeStr)))
-        renderer->uniform.textureFilter = FilterType(filterTypeIndex);
+    // Texture filtering
+    {
+        const char* filterTypeStr[] = { "NEAREST", "BILINEAR" };
+        int filterTypeIndex = (int)renderer->uniform.textureFilter;
+        if (ImGui::Combo("Texture filter", &filterTypeIndex, filterTypeStr, IM_ARRAYSIZE(filterTypeStr)))
+            renderer->uniform.textureFilter = FilterType(filterTypeIndex);
+    }
 
-    const char* faceTypeStr[] = { "NONE", "BACK", "FRONT", "FRONT_AND_BACK" };
-    int faceTypeIndex = (int)renderer->uniform.faceToCull;
-    if (ImGui::Combo("Face to cull", &faceTypeIndex, faceTypeStr, IM_ARRAYSIZE(faceTypeStr)))
-        renderer->uniform.faceToCull = FaceType(faceTypeIndex);
+    // Face orientation of front-facing polygons
+    {
+        const char* faceOrientationStr[] = { "CW", "CCW" };
+        int faceOrientationIndex = (int)renderer->uniform.faceOrientation;
+        if (ImGui::Combo("Face orientation", &faceOrientationIndex, faceOrientationStr, IM_ARRAYSIZE(faceOrientationStr)))
+            renderer->uniform.faceOrientation = FaceOrientation(faceOrientationIndex);
+    }
+    
+    // Face to cull
+    {
+        const char* faceTypeStr[] = { "NONE", "BACK", "FRONT", "FRONT_AND_BACK" };
+        int faceTypeIndex = (int)renderer->uniform.faceToCull;
+        if (ImGui::Combo("Face to cull", &faceTypeIndex, faceTypeStr, IM_ARRAYSIZE(faceTypeStr)))
+            renderer->uniform.faceToCull = FaceType(faceTypeIndex);
+    }
 
     ImGui::Checkbox("perspectiveCorrection", &renderer->uniform.perspectiveCorrection);
     ImGui::Checkbox("fillTriange", &renderer->uniform.fillTriangle);

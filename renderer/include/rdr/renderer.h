@@ -61,6 +61,8 @@ typedef struct rdrMaterial
 RDR_API rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height);
 RDR_API void rdrShutdown(rdrImpl* renderer);
 
+RDR_API void rdrFinish(rdrImpl* renderer);
+
 RDR_API void rdrSetUniformFloatV(rdrImpl* renderer, rdrUniformType type, float* value);
 RDR_API void rdrSetUniformBool(rdrImpl* renderer, rdrUniformType type, bool value);
 RDR_API void rdrSetUniformLight(rdrImpl* renderer, int index, rdrLight* light);

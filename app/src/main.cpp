@@ -202,6 +202,7 @@ int main(int argc, char* argv[])
         scnUpdate(scene, deltaTime, renderer);
 
         // Upload texture
+        rdrFinish(renderer);
         framebuffer.updateTexture();
 
         // Display debug controls
