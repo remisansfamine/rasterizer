@@ -11,8 +11,6 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-#include "common\maths.hpp"
-
 #include <iostream>
 #include <algorithm>
 
@@ -273,10 +271,8 @@ scnImpl::scnImpl()
     objects.push_back(obj3);
 
     Object obj4;
-    loadObject(obj4, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
-    //loadObject(obj4, textures, materials, "assets/sphere.obj", "assets/");
-    //loadObject(obj4.faces, textures, "assets/suzanne.obj", "assets/");
-    objects.push_back(obj4);
+    //loadObject(obj4, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
+    //objects.push_back(obj4);
 }
 
 scnImpl::~scnImpl()

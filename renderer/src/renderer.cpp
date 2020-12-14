@@ -34,9 +34,82 @@ rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int he
     return renderer;
 }
 
+float4 gammaCorrection(const float4& color, float iGamma)
+{
+    return
+    {
+        powf(color.r, iGamma),
+        powf(color.g, iGamma),
+        powf(color.b, iGamma),
+        color.a
+    };
+}
+
+float4 boxBlur(Framebuffer fb, int index)
+{
+    float4 sum =
+        fb.colorBuffer[index - 1 + fb.width] + // Top left
+        fb.colorBuffer[index     + fb.width] + // Top center
+        fb.colorBuffer[index + 1 + fb.width] + // Top right
+        fb.colorBuffer[index - 1           ] + // Mid left
+        fb.colorBuffer[index               ] + // Current pixel
+        fb.colorBuffer[index + 1           ] + // Mid right
+        fb.colorBuffer[index - 1 - fb.width] + // Low left
+        fb.colorBuffer[index     - fb.width] + // Low center
+        fb.colorBuffer[index + 1 - fb.width];  // Low right
+
+    return sum / 9.f;
+}
+
+float4 gaussianBlur(Framebuffer fb, int index)
+{
+    float4 sum =
+        fb.colorBuffer[index - 1 + fb.width] + // Top left
+        2.f * fb.colorBuffer[index + fb.width] + // Top center
+        fb.colorBuffer[index + 1 + fb.width] + // Top right
+        2.f * fb.colorBuffer[index - 1] + // Mid left
+        4.f * fb.colorBuffer[index] + // Current pixel
+        2.f * fb.colorBuffer[index + 1] + // Mid right
+        fb.colorBuffer[index - 1 - fb.width] + // Low left
+        2.f * fb.colorBuffer[index - fb.width] + // Low center
+        fb.colorBuffer[index + 1 - fb.width];  // Low right
+
+    return sum / 16.f;
+
+}
+
 void rdrFinish(rdrImpl* renderer)
 {
 
+    for (int i = 0; i < renderer->fb.width; i++)
+    {
+        for (int j = 0; j < renderer->fb.height; j++)
+        {
+            int index = i + renderer->fb.width * j;
+
+            float4& color = renderer->fb.colorBuffer[index];
+
+            // Set sum to the average of 9 pixels:
+            if (i > 0 && j > 0 && i < renderer->fb.width - 1 && j < renderer->fb.height - 1)
+            {
+                if (renderer->boxBlur)
+                    color = boxBlur(renderer->fb, index);
+
+                if (renderer->gaussianBlur)
+                    color = gaussianBlur(renderer->fb, index);
+            }
+        }
+    }
+
+    for (int i = 0; i < renderer->fb.width; i++)
+    {
+        for (int j = 0; j < renderer->fb.height; j++)
+        {
+            float4& color = renderer->fb.colorBuffer[i + renderer->fb.width * j];
+
+            color = gammaCorrection(color, renderer->iGamma);
+        }
+    }
 }
 
 void rdrShutdown(rdrImpl* renderer)
@@ -201,6 +274,8 @@ void getLightColor(const Uniform& uniform, Varying& varying)
     varying.shadedColor = uniform.material.ambientColor * (uniform.globalAmbient + ambientColorSum) +
                           uniform.material.diffuseColor * diffuseColorSum +
                           uniform.material.emissionColor;
+
+    varying.specularColor *= uniform.material.specularColor;
 }
 
 float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
@@ -214,47 +289,34 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
     float u = wrapValue(fragVars.uv.u, 1.f);
     float v = wrapValue(fragVars.uv.v, 1.f);
 
+    float s = texture.width  * u;
+    float t = texture.height * v;
+
     // Get texel color with tex coords
     float4 texColor;
     if (uniform.textureFilter == FilterType::BILINEAR)
     {
-        float s = (texture.width - 1.f) * u;
-        float t = (texture.height - 1.f) * v;
+        s -= u;
+        t -= v;
 
         int si = int(s), ti = int(t);
 
-        float lambda0 = s - si, lambda1 = t - ti;
+        int index = ti * texture.width + si;
 
         const float4 colors[4] =
         {
-            texture.data[ti * texture.width + si],              // C00
-            texture.data[ti * texture.width + (si + 1)],        // C10
-            texture.data[(ti + 1) * texture.width + si],        // C01
-            texture.data[(ti + 1) * texture.width + (si + 1)],  // C11
+            texture.data[index                    ],  // Top-left
+            texture.data[index                 + 1],  // Top-right
+            texture.data[index + texture.width    ],  // Bottom-left
+            texture.data[index + texture.width + 1],  // Bottom-right
         };
 
-        texColor = bilinear(lambda0, lambda1, colors);
+        texColor = bilinear(s - si, t - ti, colors);
     }
     else
-    {
-        int s = texture.width  * u;
-        int t = texture.height * v;
-
-        texColor = texture.data[t * texture.width + s];
-    }
+        texColor = texture.data[int(t) * texture.width + int(s)];
 
     return texColor;
-}
-
-float4 gammaCorrection(const float4& color, float iGamma)
-{
-    return
-    {
-        powf(color.r, iGamma),
-        powf(color.g, iGamma),
-        powf(color.b, iGamma),
-        color.a
-    };
 }
 
 bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
@@ -269,7 +331,7 @@ bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
         getLightColor(uniform, fragVars);
 
     outColor = getTextureColor(fragVars, uniform) * fragVars.color * fragVars.shadedColor +
-            uniform.material.specularColor * fragVars.specularColor;
+               fragVars.specularColor;
 
     return true;
 }
@@ -330,12 +392,7 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
     int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
     int yMax = max(screenCoords[0].y, max(screenCoords[1].y, screenCoords[2].y));
 
-    float area = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
-
-    if (area == 0.f)
-        return;
-
-    float inversedArea = 1.f / area;
+    float inversedArea = 1.f / getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
 
     float2 fragment;
     float3 weight;
@@ -353,7 +410,7 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
             int fbIndex = j * fb.width + i;
 
             // Depth test
-            float z, * zBuffer = nullptr;
+            float z, *zBuffer = nullptr;
             if (uniform.depthTest)
             {
                 z = interpolateFloat({ screenCoords[0].z, screenCoords[1].z, screenCoords[2].z }, weight);
@@ -362,8 +419,6 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
 
                 if (*zBuffer >= z)
                     continue;
-
-                //*zBuffer = z;
             }
 
             // Perspective correction
@@ -382,8 +437,10 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
 
             if (uniform.blending)
                 fragColor = fragColor * fragColor.a + fb.colorBuffer[fbIndex] * (1.f - fragColor.a);
+            else
+                fragColor.a = 1.f;
 
-            fb.colorBuffer[fbIndex] = gammaCorrection(fragColor, uniform.iGamma);
+            fb.colorBuffer[fbIndex] = fragColor;
         }
     }
 }
@@ -410,7 +467,7 @@ float4 vertexShader(const rdrVertex& vertex, const Uniform& uniform, Varying& va
 bool faceCulling(const float3 ndcCoords[3], FaceOrientation orientation, FaceType toCull)
 {
     int index1 = 1, index2 = 2;
-    if (orientation == FaceOrientation::COUNTER_CLOCK_WISE)
+    if (orientation == FaceOrientation::CCW)
     {
         index1 = 2;
         index2 = 1;
@@ -454,8 +511,8 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
 
     int finalPointCount = 3;
 
-    //Clip against first plane
-    for (int i = 0, plane = 1; i < 8; ++i, plane <<= 1)
+    //Clip against each plane
+    for (int i = 0, plane = 1; i < 8; i++, plane <<= 1)
     {
         // If there is no point outside this plane, continue
         if (!(outputCodes & plane))
@@ -464,47 +521,42 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
         int currentPointCount = 0;
 
         clipPoint currentVertices[9];
-        clipPoint* currentVertex  = &outputCoords[0];
-        clipPoint* previousVertex = &outputCoords[finalPointCount - 1];
+        const clipPoint* currentVertex  = &outputCoords[0];
+        const clipPoint* previousVertex = &outputCoords[finalPointCount - 1];
 
-        // Get axis index
+        // Get axis index and axis sign (-1, 0, 1)
         int axis = i < 4 ? i : i - 4;
-
-        // Get axis sign (-1, 0, 1)
         int axisSign = sign(i - 3);
 
-        unsigned char   prevCode = computeClipOutcodes(previousVertex->coords) & plane;
-        float           prevAxis = axisSign * previousVertex->coords.e[axis];
+        unsigned char   prevCode  = computeClipOutcodes(previousVertex->coords) & plane;
+        float           prevValue = previousVertex->coords.w + axisSign * previousVertex->coords.e[axis];
 
         while (currentVertex != &outputCoords[finalPointCount])
         {
-            unsigned char   currCode = computeClipOutcodes(currentVertex->coords) & plane;
-            float           currAxis = axisSign * currentVertex->coords.e[axis];
+            unsigned char   currCode  = computeClipOutcodes(currentVertex->coords) & plane;
+            float           currValue = currentVertex->coords.w + axisSign * currentVertex->coords.e[axis];
 
             // Check if only one point is outside the plane
             if (currCode ^ prevCode)
             {
-                clipPoint intersectionPoint;
-
                 // Get intersection factor with the current axes
-                float lerpFactor =
-                (previousVertex->coords.w + prevAxis) /
-                (previousVertex->coords.w + prevAxis - currentVertex->coords.w - currAxis);
-
-                // Lerp the values
-                intersectionPoint.coords  = lerp(previousVertex->coords,  currentVertex->coords,  lerpFactor);
-                intersectionPoint.weights = lerp(previousVertex->weights, currentVertex->weights, lerpFactor);
+                float lerpFactor = prevValue / (prevValue - currValue);
 
                 // Insert intersection vertex at the end of the array
-                currentVertices[currentPointCount++] = intersectionPoint;
+                currentVertices[currentPointCount++] =
+                {
+                    // Lerp the values
+                    lerp(previousVertex->coords,  currentVertex->coords,  lerpFactor),
+                    lerp(previousVertex->weights, currentVertex->weights, lerpFactor)
+                };
             }
 
             //Insert current vertex at the end of the array, if it is inside the plane 
             if (!currCode)
                 currentVertices[currentPointCount++] = *currentVertex;
 
-            prevCode = currCode;
-            prevAxis = currAxis;
+            prevCode  = currCode;
+            prevValue = currValue;
 
             //Move forward (set previous vertex and get next vertex)
             previousVertex = currentVertex++;
@@ -520,25 +572,23 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
 void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
 {
     Varying varying[3];
-
-    // Local space (v3) -> Clip space (v4)
-    float4 clipCoords[3] =
-    {
-        vertexShader(vertices[0], renderer->uniform, varying[0]),
-        vertexShader(vertices[1], renderer->uniform, varying[1]),
-        vertexShader(vertices[2], renderer->uniform, varying[2]),
-    };
-
-    clipPoint outputPoints[9] =
-    {
-        { clipCoords[0], { 1.f, 0.f, 0.f } },
-        { clipCoords[1], { 0.f, 1.f, 0.f } },
-        { clipCoords[2], { 0.f, 0.f, 1.f } }
-    };
-
+    float4 clipCoords[3];
+    clipPoint outputPoints[9];
     unsigned char outputCodes[3];
+
     for (int i = 0; i < 3; i++)
+    {
+        // Local space (v3) -> Clip space (v4) (apply vertex shader)
+        clipCoords[i] = vertexShader(vertices[i], renderer->uniform, varying[i]);
+
+        // Link clip coords and his weight
+        float3 weight = { 0.f, 0.f, 0.f };
+        weight.e[i] = 1.f;
+        outputPoints[i] = { clipCoords[i], weight };
+
+        // Compute clip codes
         outputCodes[i] = computeClipOutcodes(clipCoords[i]);
+    }
 
     // Exit if all vertices are outside the screen
     if (outputCodes[0] & outputCodes[1] & outputCodes[2])
@@ -546,41 +596,50 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
 
     int pointCount = clipTriangle(outputPoints, outputCodes[0] | outputCodes[1] | outputCodes[2]);
 
-    if (pointCount == 0) // Exit if there is no vertice in the screen
+    if (pointCount < 3) // Exit if there is not enough vertice in the screen
         return;
 
     // Clip space (v4) to NDC (v3)
-    float3 ndcCoords[9];
+    float   invertedW[9];
+    float3  ndcCoords[9];
+
     for (int i = 0; i < pointCount; i++)
-        ndcCoords[i] = outputPoints[i].coords.xyz / outputPoints[i].coords.w;
+    {
+        // Compute w
+        invertedW[i] = 1.f / outputPoints[i].coords.w;
+
+        // Get ndc coords from new clip coords
+        ndcCoords[i] = outputPoints[i].coords.xyz * invertedW[i];
+    }
 
     // Back face culling
-    if (faceCulling(ndcCoords, renderer->uniform.faceOrientation,renderer->uniform.faceToCull))
+    if (faceCulling(ndcCoords, renderer->uniform.faceOrientation, renderer->uniform.faceToCull))
         return;
 
-    float4 screenCoords[9];
+    float4  screenCoords[9];
     Varying clippedVaryings[9];
+
     for (int i = 0; i < pointCount; i++)
     {
         // NDC (v3) to screen coords (v2 + depth + clipCoord w)
-        screenCoords[i] = { ndcToScreenCoords(ndcCoords[i], renderer->viewport), 1.f / outputPoints[i].coords.w };
+        screenCoords[i] = { ndcToScreenCoords(ndcCoords[i], renderer->viewport), invertedW[i] };
 
         // Get new varyings after clipping
         clippedVaryings[i] = interpolateVarying(varying, outputPoints[i].weights);
     }
 
-    // Rasterize triangle
+    // Rasterize triangle by getting the correct screenCoords and varyings
     for (int index0 = 0, index1 = 1, index2 = 2; index2 < pointCount; index1++, index2++)
     {
-        float4 pointCoords[3] = { screenCoords[index0], screenCoords[index1], screenCoords[index2] };
+        const float4 pointCoords[3] = { screenCoords[index0], screenCoords[index1], screenCoords[index2] };
 
-        if (renderer->uniform.fillTriangle)
+        if (renderer->fillTriangle)
         {
-            Varying varyings[3] = { clippedVaryings[index0], clippedVaryings[index1], clippedVaryings[index2] };
+            const Varying varyings[3] = { clippedVaryings[index0], clippedVaryings[index1], clippedVaryings[index2] };
             rasterTriangle(renderer->fb, pointCoords, varyings, renderer->uniform);
         }
 
-        if (renderer->uniform.wireframeMode)
+        if (renderer->wireframeMode)
         {
             for (int i = 0; i < 3; i++)
                 drawLine(renderer->fb, pointCoords[i].xyz, pointCoords[(i + 1) % 3].xyz, renderer->lineColor);
@@ -591,7 +650,6 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
 void rdrDrawTriangles(rdrImpl* renderer, const rdrVertex* vertices, int count)
 {
     renderer->uniform.viewProj = renderer->uniform.projection * renderer->uniform.view;
-    renderer->uniform.mvp = renderer->uniform.viewProj * renderer->uniform.model;
 
     // Transform vertex list to triangles into colorBuffer
     for (int i = 0; i < count; i += 3)
@@ -605,14 +663,19 @@ void rdrSetImGuiContext(rdrImpl* renderer, struct ImGuiContext* context)
 
 void rdrShowImGuiControls(rdrImpl* renderer)
 {
-    if (ImGui::SliderFloat("Gamma", &renderer->uniform.gamma, 0.01f, 10.f));
-    renderer->uniform.iGamma = 1.f / renderer->uniform.gamma;
-
-    ImGui::Checkbox("Wireframe", &renderer->uniform.wireframeMode);
+    ImGui::Checkbox("Wireframe", &renderer->wireframeMode);
     ImGui::Checkbox("Depthtest", &renderer->uniform.depthTest);
-    ImGui::Checkbox("Blending", &renderer->uniform.blending);
-    ImGui::Checkbox("Lighting", &renderer->uniform.lighting);
-    ImGui::Checkbox("Phong model", &renderer->uniform.phongModel);
+
+    // Lighting tree
+    if (ImGui::TreeNode("Lighting"))
+    {
+        ImGui::Checkbox("Lighting", &renderer->uniform.lighting);
+
+        if (renderer->uniform.lighting)
+            ImGui::Checkbox("Phong model", &renderer->uniform.phongModel);
+
+        ImGui::TreePop();
+    }
 
     // Texture filtering
     {
@@ -622,28 +685,54 @@ void rdrShowImGuiControls(rdrImpl* renderer)
             renderer->uniform.textureFilter = FilterType(filterTypeIndex);
     }
 
-    // Face orientation of front-facing polygons
+    // Face culling tree
+    if (ImGui::TreeNode("Face culling"))
     {
-        const char* faceOrientationStr[] = { "CW", "CCW" };
-        int faceOrientationIndex = (int)renderer->uniform.faceOrientation;
-        if (ImGui::Combo("Face orientation", &faceOrientationIndex, faceOrientationStr, IM_ARRAYSIZE(faceOrientationStr)))
-            renderer->uniform.faceOrientation = FaceOrientation(faceOrientationIndex);
-    }
-    
-    // Face to cull
-    {
-        const char* faceTypeStr[] = { "NONE", "BACK", "FRONT", "FRONT_AND_BACK" };
-        int faceTypeIndex = (int)renderer->uniform.faceToCull;
-        if (ImGui::Combo("Face to cull", &faceTypeIndex, faceTypeStr, IM_ARRAYSIZE(faceTypeStr)))
-            renderer->uniform.faceToCull = FaceType(faceTypeIndex);
+        // Face orientation of front-facing polygons
+        {
+            const char* faceOrientationStr[] = { "Clockwise", "Counter-Clockwise" };
+            int faceOrientationIndex = (int)renderer->uniform.faceOrientation;
+            if (ImGui::Combo("Face orientation", &faceOrientationIndex, faceOrientationStr, IM_ARRAYSIZE(faceOrientationStr)))
+                renderer->uniform.faceOrientation = FaceOrientation(faceOrientationIndex);
+        }
+
+        // Face to cull
+        {
+            const char* faceTypeStr[] = { "None", "Back", "Front", "Front and back" };
+            int faceTypeIndex = (int)renderer->uniform.faceToCull;
+            if (ImGui::Combo("Face to cull", &faceTypeIndex, faceTypeStr, IM_ARRAYSIZE(faceTypeStr)))
+                renderer->uniform.faceToCull = FaceType(faceTypeIndex);
+        }
+        ImGui::TreePop();
     }
 
-    ImGui::Checkbox("perspectiveCorrection", &renderer->uniform.perspectiveCorrection);
-    ImGui::Checkbox("fillTriange", &renderer->uniform.fillTriangle);
-    ImGui::ColorEdit4("lineColor", renderer->lineColor.e);
+    ImGui::Checkbox("Perspective correction", &renderer->uniform.perspectiveCorrection);
+    ImGui::Checkbox("Rasterize triangle", &renderer->fillTriangle);
+    ImGui::ColorEdit4("Line color", renderer->lineColor.e);
 
     ImGui::ColorEdit4("Global ambient", renderer->uniform.globalAmbient.e);
     ImGui::ColorEdit4("Global color", renderer->uniform.globalColor.e);
 
-    ImGui::SliderFloat("Cutout", &renderer->uniform.cutout, 0.f, 1.f);
+    // Blending tree
+    if (ImGui::TreeNode("Blending"))
+    {
+        ImGui::Checkbox("Blending", &renderer->uniform.blending);
+
+        if (renderer->uniform.blending)
+            ImGui::SliderFloat("Cutout", &renderer->uniform.cutout, 0.f, 1.f);
+
+        ImGui::TreePop();
+    }
+
+    // Post-process tree
+    if (ImGui::TreeNode("Post-Process"))
+    {
+        ImGui::Checkbox("Box blur", &renderer->boxBlur);
+        ImGui::Checkbox("Gaussian blur", &renderer->gaussianBlur);
+
+        if (ImGui::SliderFloat("Gamma", &renderer->gamma, 0.01f, 10.f));
+            renderer->iGamma = 1.f / renderer->gamma;
+
+        ImGui::TreePop();
+    }
 }
