@@ -13,16 +13,19 @@ struct Texture
 
 struct Triangle
 {
-    std::vector<rdrVertex> vertices;
-    int textureIndex  = -1;
-    int materialIndex = -1;
+    rdrVertex vertices[3];
 };
 
 struct Mesh
 {
     std::vector<Triangle> faces;
     int textureIndex = -1;
-    int materialIndex = -1;
+    int materialIndex = 0;
+
+    Mesh() = default;
+    Mesh(int textureIndex, int materialIndex)
+        : textureIndex(textureIndex), materialIndex(materialIndex)
+    {}
 };
 
 struct Object
@@ -45,21 +48,24 @@ struct Object
 struct Light
 {
     bool    isEnable = false;
-    float4  lightPos = { 0.f, 0.f, 0.f, 1.f };
-    float4  ambient = { 0.f, 0.f, 0.f, 0.f };
-    float4  diffuse = { 1.f, 1.f, 1.f, 1.f };
-    float4  specular = { 0.f, 0.f, 0.f, 0.f };
-    float   constantAttenuation = 1.f;
-    float   linearAttenuation = 0.f;
+
+    float4  lightPos = { 0.0f, 0.0f, 0.0f, 1.f };
+    float4  ambient  = { 0.0f, 0.0f, 0.0f, 1.f };
+    float4  diffuse  = { 1.0f, 1.0f, 1.0f, 1.f };
+    float4  specular = { 1.0f, 1.0f, 1.0f, 1.f };
+
+    float   constantAttenuation  = 1.f;
+    float   linearAttenuation    = 0.f;
     float   quadraticAttenuation = 0.f;
 };
 
 struct Material
 {
-    float4 ambientColor = { 1.f, 1.f, 1.f, 1.f };
-    float4 diffuseColor = { 1.f, 1.f, 1.f, 1.f };
-    float4 specularColor = { 1.f, 1.f, 1.f, 1.f };
-    float4 emissionColor = { 0.f, 0.f, 0.f, 0.f };
+    float4 ambientColor  = { 0.2f, 0.2f, 0.2f, 1.0f };
+    float4 diffuseColor  = { 0.8f, 0.8f, 0.8f, 1.0f };
+    float4 specularColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+    float4 emissionColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+
     float shininess = 20.f;
 };
 
@@ -74,14 +80,7 @@ struct scnImpl
     std::vector<Object> objects;
     std::vector<Texture> textures;
 
-    Material defaultMaterial =
-    {
-        { 1.f, 1.f, 1.f, 1.f },
-        { 1.f, 1.f, 1.f, 1.f },
-        { 1.f, 1.f, 1.f, 1.f },
-        { 0.f, 0.f, 0.f, 0.f },
-        20.f
-    };
+    Material defaultMaterial;
 
     std::vector<Material> materials = { defaultMaterial };
     Light lights[8];

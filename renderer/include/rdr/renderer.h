@@ -37,11 +37,11 @@ enum rdrUniformType
 {
     UT_TIME,            // 1 float
     UT_DELTATIME,       // 1 float
-    UT_CAMERA_POS,       // 3 floats
+    UT_CAMERA_POS,      // 3 floats
     UT_GLOBALAMBIENT,   // 4 floats
     UT_GLOBALCOLOR,     // 4 floats
-    UT_DEPTHTEST,       // 1 bool
-    UT_STENCTILTEST,    // 1 bool
+    UT_DEPTH_TEST,      // 1 bool
+    UT_STENCIL_TEST,    // 1 bool
     UT_USER = 100,
 };
 
@@ -61,8 +61,10 @@ typedef struct rdrMaterial
 RDR_API rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height);
 RDR_API void rdrShutdown(rdrImpl* renderer);
 
+// Post-process events
 RDR_API void rdrFinish(rdrImpl* renderer);
 
+// Set differents parameters for the renderer
 RDR_API void rdrSetUniformFloatV(rdrImpl* renderer, rdrUniformType type, float* value);
 RDR_API void rdrSetUniformBool(rdrImpl* renderer, rdrUniformType type, bool value);
 RDR_API void rdrSetUniformLight(rdrImpl* renderer, int index, rdrLight* light);

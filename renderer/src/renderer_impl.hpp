@@ -33,21 +33,24 @@ struct rdrTexture
 struct Light
 {
     bool    isEnable = false;
-    float4  lightPos = { 0.f, 0.f, 0.f, 1.f };
-    float4  ambient = { 0.f, 0.f, 0.f, 0.f };
-    float4  diffuse = { 1.f, 1.f, 1.f, 1.f };
-    float4  specular = { 0.f, 0.f, 0.f, 0.f };
-    float   constantAttenuation = 1.f;
-    float   linearAttenuation = 0.f;
+
+    float4  lightPos = { 0.0f, 0.0f, 0.0f, 1.f };
+    float4  ambient  = { 0.0f, 0.0f, 0.0f, 1.f };
+    float4  diffuse  = { 1.0f, 1.0f, 1.0f, 1.f };
+    float4  specular = { 1.0f, 1.0f, 1.0f, 1.f };
+
+    float   constantAttenuation  = 1.f;
+    float   linearAttenuation    = 0.f;
     float   quadraticAttenuation = 0.f;
 };
 
 struct Material
 {
-    float4 ambientColor = { 0.f, 0.f, 0.f, 0.f };
-    float4 diffuseColor = { 1.f, 1.f, 1.f, 1.f };
-    float4 specularColor = { 1.f, 1.f, 1.f, 1.f };
-    float4 emissionColor = { 0.f, 0.f, 0.f, 0.f };
+    float4 ambientColor  = { 0.2f, 0.2f, 0.2f, 1.0f };
+    float4 diffuseColor  = { 0.8f, 0.8f, 0.8f, 1.0f };
+    float4 specularColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+    float4 emissionColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+
     float shininess = 20.f;
 };
 
@@ -56,7 +59,7 @@ struct Uniform
     float time;
     float deltaTime;
 
-    float4 globalColor = { 1.f, 1.f, 1.f, 1.f };
+    float4 globalColor   = { 1.f, 1.f, 1.f, 1.f };
     float4 globalAmbient = {0.2f, 0.2f, 0.2f, 1.f};
     float shiness = 80.f;
 
@@ -73,7 +76,6 @@ struct Uniform
     mat4x4 projection;
 
     bool depthTest = true;
-    bool stencilTest = false;
 
     bool blending = true;
     float cutout = 0.5f;
@@ -126,6 +128,7 @@ struct rdrImpl
     bool wireframeMode = false;
     bool boxBlur = false;
     bool gaussianBlur = false;
+    bool lightBloom = false;
 
     float gamma = 2.2f;
     float iGamma = 1.f / 2.2f;

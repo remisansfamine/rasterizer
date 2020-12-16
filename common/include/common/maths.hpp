@@ -45,6 +45,74 @@ namespace mat4
     mat4x4 frustum(float left, float right, float bottom, float top, float near, float far);
 }
 
+inline float remap(float value, float oldMin, float oldMax, float newMin, float newMax)
+{
+    return (value - oldMin) * (newMax - newMin) / (oldMax - oldMin) + newMin;
+}
+
+inline float fract(float value)
+{
+    return value - floor(value);
+}
+
+inline float wrap01(float value)
+{
+    return fract(fract(value) + 1.f);
+}
+
+inline float wrapValue(float value, float max)
+{
+    return value - max * floorf(value / max);
+}
+
+inline float trueMod(float value, float dividend)
+{
+    float result = fmodf(value, dividend);
+    return result < 0.f ? result + dividend : result;
+}
+
+template <typename T>
+inline int sign(T value)
+{
+    return (T(0) < value) - (value < T(0));
+}
+
+template<typename T>
+inline T min(T value0, T value1)
+{
+    return value0 < value1 ? value0 : value1;
+}
+
+template<typename T>
+inline T max(T value0, T value1)
+{
+    return value0 < value1 ? value1 : value0;
+}
+
+template<typename T>
+inline T clamp(float value, T min, T max)
+{
+    return min(max(value, min), max);
+}
+
+template<typename T>
+inline T saturate(T value)
+{
+    return clamp(value, T(0), T(1));
+}
+
+template<typename T>
+inline T lerp(T value0, T value1, float lambda)
+{
+    return lambda * value1 + (1.f - lambda) * value0;
+}
+
+template<typename T>
+inline T bilinear(float lambda1, float lambda2, const T values[4])
+{
+    return lerp(lerp(values[0], values[1], lambda1), lerp(values[2], values[3], lambda1), lambda2);
+}
+
 inline float2 operator*(const float2& v, float a)
 {
     return { v.x * a, v.y * a };
@@ -77,7 +145,7 @@ inline float2 operator/(const float2& v, float a)
 
 inline float4 operator+(const float4& v1, const float4& v2)
 {
-    return { v1.x + v2.x, v1.y + v2.y , v1.z + v2.z ,v1.w + v2.w };
+    return { v1.x + v2.x, v1.y + v2.y , v1.z + v2.z , v1.w + v2.w };
 }
 
 inline float4 operator+=(float4& v1, const float4& v2)
@@ -293,67 +361,4 @@ inline float4 normalized(const float4& v)
 {
     float magn = magnitude(v);
     return v / magn;
-}
-
-inline float remap(float value, float oldMin, float oldMax, float newMin, float newMax)
-{
-    return (value - oldMin) * (newMax - newMin) / (newMin - oldMin) + newMin;
-}
-
-inline float fract(float value)
-{
-    return value - floor(value);
-}
-
-inline float wrapValue(float value, float max)
-{
-    return value - max * floorf(value / max);
-}
-
-inline float trueMod(float value, float dividend)
-{
-    float result = fmodf(value, dividend);
-    return result < 0.f ? result + dividend : result;
-}
-
-template <typename T>
-inline int sign(T value)
-{
-    return (T(0) < value) - (value < T(0));
-}
-
-template<typename T>
-inline T min(T value0, T value1)
-{
-    return value0 < value1 ? value0 : value1;
-}
-
-template<typename T>
-inline T max(T value0, T value1)
-{
-    return value0 < value1 ? value1 : value0;
-}
-
-template<typename T>
-inline T clamp(float value, T min, T max)
-{
-    return min(max(value, min), max);
-}
-
-template<typename T>
-inline T saturate(T value)
-{
-    return clamp(value, T(0), T(1));
-}
-
-template<typename T>
-inline T lerp(T value0, T value1, float lambda)
-{
-    return lambda * value1 + (1.f - lambda) * value0;
-}
-
-template<typename T>
-inline T bilinear(const float& lambda1, const float& lambda2, const T values[4])
-{
-    return lerp(lerp(values[0], values[1], lambda1), lerp(values[2], values[3], lambda1), lambda2);
 }
