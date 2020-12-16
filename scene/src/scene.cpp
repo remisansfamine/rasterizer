@@ -38,8 +38,8 @@ int loadTexture(std::vector<Texture>& textures, const char* filePath)
 int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess)
 {
     Material mat;
-    mat.ambientColor = float4(ambient[0], ambient[1], ambient[2], 1.f);
-    mat.diffuseColor = float4(diffuse[0], diffuse[1], diffuse[2], 1.f);
+    mat.ambientColor  = float4(ambient[0],  ambient[1],  ambient[2], 1.f);
+    mat.diffuseColor  = float4(diffuse[0],  diffuse[1],  diffuse[2], 1.f);
     mat.specularColor = float4(specular[0], specular[1], specular[2], 1.f);
     mat.emissionColor = float4(emissive[0], emissive[1], emissive[2], 0.f);
     mat.shininess = shininess;
@@ -47,9 +47,9 @@ int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffu
     std::vector<Material>::iterator it = std::find_if(materials.begin(), materials.end(),
                                         [mat](const Material& m)
                                         {
-                                            return m.shininess == mat.shininess &&
-                                                   m.ambientColor == mat.ambientColor &&
-                                                   m.diffuseColor == mat.diffuseColor &&
+                                            return m.shininess     == mat.shininess     &&
+                                                   m.ambientColor  == mat.ambientColor  &&
+                                                   m.diffuseColor  == mat.diffuseColor  &&
                                                    m.specularColor == mat.specularColor &&
                                                    m.emissionColor == mat.emissionColor;
                                         });
@@ -71,19 +71,16 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
     std::string warn;
     std::string err;
 
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filePath.c_str(), mtlBasedir.c_str());
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filePath.c_str(), mtlBasedir.c_str(), true);
 
-    if (!warn.empty()) {
+    if (!warn.empty())
         std::cerr << warn << std::endl;
-    }
 
-    if (!err.empty()) {
+    if (!err.empty())
         std::cerr << err << std::endl;
-    }
 
-    if (!ret) {
+    if (!ret)
         return 0;
-    }
 
     if (!materials.empty())
     {
@@ -91,21 +88,15 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
         {
             tinyobj::material_t& mat = materials[m];
 
-            Mesh mesh;
-            mesh.textureIndex = loadTexture(scnTextures, (mtlBasedir + mat.diffuse_texname).c_str());
-            if (mesh.textureIndex == -1)
-                std::cout << mtlBasedir + mat.diffuse_texname << std::endl;
-            mesh.materialIndex = loadMaterial(scnMaterials, mat.ambient, mat.diffuse, mat.specular, mat.emission, mat.shininess);
-            object.mesh.push_back(mesh);
+            int textureIndex  = loadTexture(scnTextures, (mtlBasedir + mat.diffuse_texname).c_str());
+            int materialIndex = loadMaterial(scnMaterials, mat.ambient, mat.diffuse, mat.specular, mat.emission, mat.shininess);
+
+            object.mesh.push_back(Mesh(textureIndex, materialIndex));
         }
     }
+    // If there is no material, add only one mesh, without material nor texture
     else
-    {
-        Mesh mesh;
-        mesh.textureIndex = -1;
-        mesh.materialIndex = 0;
-        object.mesh.push_back(mesh);
-    }
+        object.mesh.push_back(Mesh(-1, 0));
 
     // Loop over shapes
     for (size_t s = 0; s < shapes.size(); s++)
@@ -114,9 +105,12 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
         {
-            int meshIndex = std::max(0,  shapes[s].mesh.material_ids[f]);
+            size_t meshIndex = shapes[s].mesh.material_ids[f];
 
-            int fv = shapes[s].mesh.num_face_vertices[f];
+            size_t fv = shapes[s].mesh.num_face_vertices[f];
+                 
+            if (attrib.vertices.empty())
+                continue;
 
             Triangle face;
 
@@ -152,12 +146,25 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
                     vertice.v = attrib.texcoords[2 * idx.texcoord_index + 1];
                 }
 
-                face.vertices.push_back(vertice);
+                face.vertices[v] = vertice;
             }
 
             index_offset += fv;
 
-            object.mesh[meshIndex].faces.push_back(face);
+            bool isAccepted = true;
+            for (int i = 0; i < 3; i++)
+            {
+                if (face.vertices[i].x == face.vertices[(i + 1) % 3].x &&
+                    face.vertices[i].y == face.vertices[(i + 1) % 3].y &&
+                    face.vertices[i].z == face.vertices[(i + 1) % 3].z)
+                {
+                    isAccepted = false;
+                    break;
+                }
+            }
+
+            if (isAccepted)
+                object.mesh[meshIndex].faces.push_back(face);
         }
     }
 
@@ -182,17 +189,17 @@ void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int 
             float v0 = j * vGrad;
             float v1 = v0 + vGrad;
 
-            //                                      pos                   normal                    color                  uv
-            Triangle face1;
-            face1.vertices.push_back({ u0 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u0, v0 });
-            face1.vertices.push_back({ u1 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u1, v0 });
-            face1.vertices.push_back({ u1 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u1, v1 });
+            Triangle face1, face2;
+
+            //                                pos                       normal                  color                  uv
+            face1.vertices[0] = { u0 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.0f,     u0, v0 };
+            face1.vertices[1] = { u1 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.0f,     u1, v0 };
+            face1.vertices[2] = { u1 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.0f,     u1, v1 };
             mesh.faces.push_back(face1);
 
-            Triangle face2;
-            face2.vertices.push_back({ u1 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u1, v1 });
-            face2.vertices.push_back({ u0 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u0, v1 });
-            face2.vertices.push_back({ u0 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.f,     u0, v0 });
+            face2.vertices[0] = { u1 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.0f,     u1, v1 };
+            face2.vertices[1] = { u0 - 0.5f, v1 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.0f,     u0, v1 };
+            face2.vertices[2] = { u0 - 0.5f, v0 - 0.5f, 0.0f,     0.0f, 0.0f, 1.0f,      1.0f, 1.0f, 1.0f, 1.0f,     u0, v0 };
             mesh.faces.push_back(face2);
         }
     }
@@ -208,9 +215,9 @@ void loadTriangle(Object& object, int textureIndex = -1, int materialIndex = 0)
     Triangle face;
 
     //                          pos                   normal                  color                     uv
-    face.vertices.push_back({-0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f });
-    face.vertices.push_back({ 0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     0.5f, 0.5f });
-    face.vertices.push_back({ 0.0f,  0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f });
+    face.vertices[0] = {-0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      1.0f, 0.0f, 0.0f, 1.f,     0.0f, 0.0f };
+    face.vertices[1] = { 0.5f, -0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 1.0f, 0.0f, 1.f,     0.5f, 0.5f };
+    face.vertices[2] = { 0.0f,  0.5f, 0.0f,      0.0f, 0.0f, 1.0f,      0.0f, 0.0f, 1.0f, 1.f,     0.0f, 1.0f };
 
     mesh.faces.push_back(face);
     object.mesh.push_back(mesh);
@@ -261,18 +268,14 @@ scnImpl::scnImpl()
     loadQuad(obj1, loadTexture(textures, "assets/inputbilinear.png"));
     objects.push_back(obj1);
 
-    Object obj2({ 0.f, 0.f, -2.f }, { 0.f, M_PI, 0.f });
-    //loadQuad(obj2, &textures, "assets/Deathclaw.png");
-    //if (loadObject(obj2.vertices, "assets/sphere.obj", "assets", 0.5f))
-    //objects.push_back(obj2);
-    
-    Object obj3;
-    //loadObject(obj3, textures, materials, "assets/deathclaw.obj", "assets/", 0.5f);
-    objects.push_back(obj3);
+    Object obj2;
+    loadObject(obj2, textures, materials, "assets/deathclaw.obj", "assets/", 0.005f);
+    objects.push_back(obj2);
 
-    Object obj4;
-    //loadObject(obj4, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
-    //objects.push_back(obj4);
+    Object obj3;
+    loadObject(obj3, textures, materials, "assets/the_noble_craftsman.obj", "assets/");
+    //loadObject(obj3, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
+    objects.push_back(obj3);
 }
 
 scnImpl::~scnImpl()
@@ -284,9 +287,6 @@ scnImpl::~scnImpl()
 
 void editLights(rdrImpl* renderer, scnImpl* scene)
 {
-    if (!scene || !renderer)
-        return;
-
     static int selectedLight = 0;
     if (ImGui::TreeNode("Lights"))
     {
@@ -299,9 +299,9 @@ void editLights(rdrImpl* renderer, scnImpl* scene)
         if (ImGui::Checkbox("Is point light", (bool*)&isPoint));
             scene->lights[selectedLight].lightPos.w = isPoint;
 
-        ImGui::ColorEdit4("Ambient", scene->lights[selectedLight].ambient.e);
-        ImGui::ColorEdit4("Diffuse", scene->lights[selectedLight].diffuse.e);
-        ImGui::ColorEdit4("Specular", scene->lights[selectedLight].specular.e);
+        ImGui::ColorEdit4("Ambient", scene->lights[selectedLight].ambient.e, ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit4("Diffuse", scene->lights[selectedLight].diffuse.e, ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit4("Specular", scene->lights[selectedLight].specular.e, ImGuiColorEditFlags_Float);
 
         ImGui::SliderFloat("Constant attenuation", &scene->lights[selectedLight].constantAttenuation, 0.f, 10.f);
         ImGui::SliderFloat("Linear attenuation", &scene->lights[selectedLight].linearAttenuation, 0.f, 10.f);
@@ -320,12 +320,14 @@ void editMaterials(scnImpl* scene)
     {
         ImGui::SliderInt("Selected material", &selectedMaterial, 0, scene->materials.size() - 1);
 
-        ImGui::ColorEdit3("Ambient", scene->materials[selectedMaterial].ambientColor.e);
-        ImGui::ColorEdit3("Diffuse", scene->materials[selectedMaterial].diffuseColor.e);
-        ImGui::ColorEdit3("Specular", scene->materials[selectedMaterial].specularColor.e);
-        ImGui::ColorEdit3("Emission", scene->materials[selectedMaterial].emissionColor.e);
+        ImGui::ColorEdit4("Ambient", scene->materials[selectedMaterial].ambientColor.e, ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit4("Diffuse", scene->materials[selectedMaterial].diffuseColor.e, ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit4("Specular", scene->materials[selectedMaterial].specularColor.e, ImGuiColorEditFlags_Float);
+        ImGui::ColorEdit4("Emission", scene->materials[selectedMaterial].emissionColor.e, ImGuiColorEditFlags_Float);
 
         ImGui::DragFloat("shininess", &scene->materials[selectedMaterial].shininess, 0.f);
+
+        ImGui::TreePop();
     }
 }
 
@@ -349,6 +351,8 @@ void editObjects(scnImpl* scene)
         {
             static int selectedMesh = 0;
             ImGui::SliderInt("Selected mesh", &selectedMesh, 0, scene->objects[selectedObject].mesh.size() - 1);
+
+            ImGui::SliderInt("Material index", &scene->objects[selectedObject].mesh[selectedMesh].materialIndex, 0, scene->materials.size() - 1);
             ImGui::SliderInt("Texture index", &scene->objects[selectedObject].mesh[selectedMesh].textureIndex, -1, scene->textures.size() - 1);
         }
         ImGui::TreePop();
@@ -379,13 +383,13 @@ void scnImpl::drawObject(Object object, rdrImpl* renderer)
 
         // Then draw all his triangle
         for (const Triangle& face : mesh.faces)
-            rdrDrawTriangles(renderer, face.vertices.data(), (int)face.vertices.size());
+            rdrDrawTriangles(renderer, face.vertices, 3);
     }
 }
 
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
-    rdrSetUniformBool(renderer, UT_STENCTILTEST, false);
+    rdrSetUniformBool(renderer, UT_STENCIL_TEST, false);
 
     editLights(renderer, this);
 

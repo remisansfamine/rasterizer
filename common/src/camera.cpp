@@ -43,12 +43,7 @@ mat4x4 Camera::getProjection()
 
 void Camera::showImGuiControls()
 {
-    if (ImGui::TreeNode("Camera settings"))
-    {
-        ImGui::SliderFloat("FOV", &fovY, 0.f, 180.f);
-        ImGui::SliderFloat("near", &near, 0.001f, 10.f);
-        ImGui::SliderFloat("far", &far, 0.75f, 500.f);
-
-        ImGui::TreePop();
-    }
+    ImGui::SliderFloat("FOV", &fovY, 0.f, 180.f);
+    ImGui::SliderFloat("near", &near, 0.001f, 10.f);
+    ImGui::SliderFloat("far", &far, 0.75f, 500.f);
 }
