@@ -11,6 +11,8 @@
 
 #include <algorithm>
 
+#define NB_SAMPLES 4
+
 struct clipPoint
 {
     float4 coords;
@@ -23,6 +25,8 @@ rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int he
 
     renderer->fb.colorBuffer = reinterpret_cast<float4*>(colorBuffer32Bits);
     renderer->fb.depthBuffer = depthBuffer;
+    renderer->fb.msaaColorBuffer = new float4[width * height * NB_SAMPLES]();
+    renderer->fb.msaaDepthBuffer = new float[width * height * NB_SAMPLES]();
     renderer->fb.width = width;
     renderer->fb.height = height;
 
@@ -64,56 +68,82 @@ float4 gaussianBlur(Framebuffer fb, int index)
 {
     // Return the 'normalized' sum of a 3x3 pixels grid applied with some coefficients
     float4 sum =
-              fb.colorBuffer[index - 1 + fb.width] + // Top left
-        2.f * fb.colorBuffer[index     + fb.width] + // Top center
-              fb.colorBuffer[index + 1 + fb.width] + // Top right
+              fb.colorBuffer[index - 1 + fb.width] + // Low left
+        2.f * fb.colorBuffer[index     + fb.width] + // Low center
+              fb.colorBuffer[index + 1 + fb.width] + // Low right
         2.f * fb.colorBuffer[index - 1           ] + // Mid left
         4.f * fb.colorBuffer[index               ] + // Current pixel
         2.f * fb.colorBuffer[index + 1           ] + // Mid right
-              fb.colorBuffer[index - 1 - fb.width] + // Low left
-        2.f * fb.colorBuffer[index     - fb.width] + // Low center
-              fb.colorBuffer[index + 1 - fb.width];  // Low right
+              fb.colorBuffer[index - 1 - fb.width] + // Top left
+        2.f * fb.colorBuffer[index     - fb.width] + // Top center
+              fb.colorBuffer[index + 1 - fb.width];  // Top right
 
     return sum / 16.f;
 }
 
 void rdrFinish(rdrImpl* renderer)
-{
+{ 
+    float4* color = renderer->fb.colorBuffer;
+    float4* msaaColor = renderer->fb.msaaColorBuffer;
+
     #pragma region Box blur, gaussian blur and light bloom post-process effects
-    for (int i = 0; i < renderer->fb.width; i++)
+    int offset = 1;
+
+    for (int i = offset; i < renderer->fb.width - offset; i++)
     {
-        for (int j = 0; j < renderer->fb.height; j++)
+        for (int j = offset; j < renderer->fb.height - offset; j++)
         {
             int index = i + renderer->fb.width * j;
 
-            float4& color = renderer->fb.colorBuffer[index];
+            float4& currentColor = color[index];
 
-            // Set sum to the average of 9 pixels:
-            if (i > 0 && j > 0 && i < renderer->fb.width - 1 && j < renderer->fb.height - 1)
-            {
-                if (renderer->boxBlur)
-                    color = boxBlur(renderer->fb, index);
+            if (renderer->boxBlur)
+                currentColor = boxBlur(renderer->fb, index);
 
-                // Gaussian blur and light bloom
-                if (renderer->gaussianBlur || color.a > 1.1f && renderer->lightBloom)
-                    color = gaussianBlur(renderer->fb, index);
-            }
+            // Gaussian blur and light bloom
+            if (renderer->gaussianBlur || currentColor.a > 2.5f && renderer->lightBloom)
+                currentColor = gaussianBlur(renderer->fb, index);
         }
     }
     #pragma endregion
 
     #pragma region Pixel per pixel post-process
-    for (int i = 0; i < renderer->fb.width * renderer->fb.height; i++)
+    for (int i = 0; i < renderer->fb.width; i++)
     {
-        float4& color = renderer->fb.colorBuffer[i];
+        for (int j = 0; j < renderer->fb.height; j++)
+        {
+            int index = renderer->fb.width * j + i;
 
-        color = gammaCorrection(color, renderer->iGamma);
+            float4& currentColor = color[index];
+
+            if (renderer->uniform.msaa)
+            {
+                float4 sum = { 0.f, 0.f, 0.f, 0.f };
+
+                int msaaIndex = index * NB_SAMPLES;
+
+                for (int k = 0; k < NB_SAMPLES; k++)
+                    sum += renderer->fb.msaaColorBuffer[msaaIndex + k];
+
+                currentColor = sum / NB_SAMPLES;
+            }
+
+            currentColor = gammaCorrection(currentColor, renderer->iGamma);
+        }
+        
     }
     #pragma endregion
+
+    float4 clearColor = { 0.f, 0.f, 0.f, 1.f };
+
+    for (size_t i = 0; i < renderer->fb.width * renderer->fb.height * 4; ++i)
+        memcpy(&msaaColor[i], &clearColor, sizeof(float4));
 }
 
 void rdrShutdown(rdrImpl* renderer)
 {
+    delete[] renderer->fb.msaaColorBuffer;
+    delete[] renderer->fb.msaaDepthBuffer;
     delete renderer;
 }
 
@@ -195,14 +225,26 @@ void drawPixel(float4* colorBuffer, int width, int height, int x, int y, const f
     colorBuffer[y * width + x] = color;
 }
 
-void drawLine(float4* colorBuffer, int width, int height, int x0, int y0, int x1, int y1, const float4& color)
+void drawLine(const Framebuffer& fb, int x0, int y0, int x1, int y1, const float4& color, bool MSAA = false)
 {
     int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
     int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
     int err = (dx > dy ? dx : -dy) / 2, e2;
 
     for (;;) {
-        drawPixel(colorBuffer, width, height, x0, y0, color);
+        if (x0 >= 0 && x0 < fb.width && y0 >= 0 && y0 < fb.height)
+        {
+            int index = y0 * fb.width + x0;
+
+            if (MSAA)
+            {
+                for (int k = 0; k < NB_SAMPLES; k++)
+                    fb.msaaColorBuffer[index * NB_SAMPLES + k] = color;
+            }
+            else
+                fb.colorBuffer[index] = color;
+        }
+
         if (x0 == x1 && y0 == y1) break;
         e2 = err;
         if (e2 > -dx) { err -= dy; x0 += sx; }
@@ -210,9 +252,9 @@ void drawLine(float4* colorBuffer, int width, int height, int x0, int y0, int x1
     }
 }
 
-void drawLine(const Framebuffer& fb, const float3& p0, const float3& p1, const float4& color)
+void drawLine(const Framebuffer& fb, const float3& p0, const float3& p1, const float4& color, bool MSAA = false)
 {
-    drawLine(fb.colorBuffer, fb.width, fb.height, (int)roundf(p0.x), (int)roundf(p0.y), (int)roundf(p1.x), (int)roundf(p1.y), color);
+    drawLine(fb, (int)roundf(p0.x), (int)roundf(p0.y), (int)roundf(p1.x), (int)roundf(p1.y), color, MSAA);
 }
 
 float3 ndcToScreenCoords(const float3& ndc, const Viewport& viewport)
@@ -224,12 +266,6 @@ float3 ndcToScreenCoords(const float3& ndc, const Viewport& viewport)
         remap(-ndc.y, -1.f, 1.f, viewport.y, viewport.height),
         remap(-ndc.z, -1.f, 1.f, 0.f, 1.f)
     };
-}
-
-float getWeight(const float2& a, const float2& b, const float2& c)
-{
-    // Get the weight of C with [AB]
-    return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 }
 
 void getLightColor(const Uniform& uniform, Varying& varying)
@@ -246,20 +282,26 @@ void getLightColor(const Uniform& uniform, Varying& varying)
 
         const Light& currLight = uniform.lights[i];
 
-        float3 lightDir = (currLight.lightPos).xyz / (currLight.lightPos).w - currLight.lightPos.w * varying.coords;
+        float3 lightDir = currLight.lightPos.xyz / currLight.lightPos.w - currLight.lightPos.w * varying.coords;
 
         float  distance = magnitude(lightDir);
 
         lightDir /= distance;
 
-        if (!currLight.lightPos.w)
+        float attenuation;
+        if (currLight.lightPos.w == 0.f)
+        {
             lightDir *= -1.f;
+            attenuation = 1.f;
+        }
+        else
+        {
+            attenuation = currLight.constantAttenuation +
+                          currLight.linearAttenuation * distance +
+                          currLight.quadraticAttenuation * distance * distance;
+        }
 
         float NdotL = dot(lightDir, normal);
-
-        float attenuation = currLight.constantAttenuation  +
-                            currLight.linearAttenuation    * distance +
-                            currLight.quadraticAttenuation * distance * distance;
 
         // Ambient
         ambientColorSum += currLight.ambient / attenuation;
@@ -425,6 +467,22 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
             // Check if it is in the triangle
             if (!getBarycentric(screenCoords, fragment, inversedArea, weight))
                 continue;
+            /*{
+                float2 edge0 = screenCoords[2].xy - screenCoords[1].xy;
+                float2 edge1 = screenCoords[0].xy - screenCoords[2].xy;
+                float2 edge2 = screenCoords[1].xy - screenCoords[0].xy;
+
+                bool overlaps = true;
+
+                // If the point is on the edge, test if it is a top or left edge, 
+                // otherwise test if  the edge function is positive
+                overlaps &= (weight.x == 0 ? ((edge0.y == 0 && edge0.x > 0) || edge0.y > 0) : (weight.x > 0));
+                overlaps &= (weight.y == 0 ? ((edge1.y == 0 && edge1.x > 0) || edge1.y > 0) : (weight.y > 0));
+                overlaps &= (weight.z == 0 ? ((edge2.y == 0 && edge2.x > 0) || edge2.y > 0) : (weight.z > 0));
+
+                if (!overlaps)
+                    continue;
+            }*/
 
             int fbIndex = j * fb.width + i;
 
@@ -457,10 +515,39 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
                 *zBuffer = z;
 
             // If there is blending, get the last pixel in the colorBuffer and add it to the fragment color
-            if (uniform.blending)
+            if (uniform.blending && fragColor.a < 1.f)
                 fragColor = fragColor * max(fragColor.a, 0.f) + fb.colorBuffer[fbIndex] * (1.f - min(fragColor.a, 1.f));
 
-            fb.colorBuffer[fbIndex] = fragColor;
+            if (uniform.msaa)
+            {
+                int msaaIndex = fbIndex * NB_SAMPLES;
+
+                float3 sampleWeight;
+                /*float2 sampleOffset = { 0.25f, 0.25f };
+                for (int k = 0; k < NB_SAMPLES; k++)
+                {
+                    sampleOffset.x *= -1.f;
+                    sampleOffset.y = sign(k - NB_SAMPLES / 2);
+
+                    if (!getBarycentric(screenCoords, fragment + sampleOffset, inversedArea, sampleWeight))
+                        continue;
+
+                    fb.msaaColorBuffer[msaaIndex + k] = fragColor;
+                }*/
+                if (getBarycentric(screenCoords, fragment + float2{-0.25f,-0.25f }, inversedArea, sampleWeight))
+                    fb.msaaColorBuffer[msaaIndex + 0] = fragColor;
+
+                if (getBarycentric(screenCoords, fragment + float2{ 0.25f,-0.25f }, inversedArea, sampleWeight))
+                    fb.msaaColorBuffer[msaaIndex + 1] = fragColor;
+
+                if (getBarycentric(screenCoords, fragment + float2{-0.25f, 0.25f }, inversedArea, sampleWeight))
+                    fb.msaaColorBuffer[msaaIndex + 2] = fragColor;
+
+                if (getBarycentric(screenCoords, fragment + float2{ 0.25f, 0.25f }, inversedArea, sampleWeight))
+                    fb.msaaColorBuffer[msaaIndex + 3] = fragColor;
+            }
+            else 
+                fb.colorBuffer[fbIndex] = fragColor;
         }
     }
 }
@@ -687,7 +774,7 @@ void drawTriangle(rdrImpl* renderer, const rdrVertex vertices[3])
         if (renderer->wireframeMode)
         {
             for (int i = 0; i < 3; i++)
-                drawLine(renderer->fb, pointCoords[i].xyz, pointCoords[(i + 1) % 3].xyz, renderer->lineColor);
+                drawLine(renderer->fb, pointCoords[i].xyz, pointCoords[(i + 1) % 3].xyz, renderer->lineColor, renderer->uniform.msaa);
         }
     }
     #pragma endregion
@@ -710,6 +797,8 @@ void rdrSetImGuiContext(rdrImpl* renderer, struct ImGuiContext* context)
 
 void rdrShowImGuiControls(rdrImpl* renderer)
 {
+    ImGui::Checkbox("MSAA", &renderer->uniform.msaa);
+
     #pragma region Lighting tree
     if (ImGui::TreeNode("Lighting"))
     {
