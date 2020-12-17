@@ -6,6 +6,8 @@
 
 #include <string>
 
+#include <limits>
+
 #include <algorithm>
 
 // Constant and common maths functions
@@ -52,7 +54,7 @@ inline float remap(float value, float oldMin, float oldMax, float newMin, float 
 
 inline float fract(float value)
 {
-    return value - floor(value);
+    return value - floorf(value);
 }
 
 inline float wrap01(float value)
@@ -143,6 +145,12 @@ inline float2 operator/(const float2& v, float a)
     return { v.x / a, v.y / a };
 }
 
+inline float getWeight(const float2& a, const float2& b, const float2& c)
+{
+    // Get the weight of C with [AB]
+    return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
+}
+
 inline float4 operator+(const float4& v1, const float4& v2)
 {
     return { v1.x + v2.x, v1.y + v2.y , v1.z + v2.z , v1.w + v2.w };
@@ -188,7 +196,10 @@ inline float4& operator*=(float4& v, float scale)
 
 inline float4 operator/(const float4& v, float scale)
 {
-    return scale == 0.f ? v : float4{ v.x / scale, v.y / scale, v.z / scale, v.w / scale };
+    if (scale == 0.f)
+        scale = std::numeric_limits<float>::epsilon();
+
+    return float4{ v.x / scale, v.y / scale, v.z / scale, v.w / scale };
 }
 
 inline float4& operator/=(float4& v, float scale)
@@ -292,6 +303,9 @@ inline float3 operator-(const float3& v1, const float3& v2)
 
 inline float3 operator/(const float3& v, float scale)
 {
+    if (scale == 0.f)
+        scale = std::numeric_limits<float>::epsilon();
+
     return scale == 0.f ? v : float3{ v.x / scale, v.y / scale, v.z / scale };
 }
 

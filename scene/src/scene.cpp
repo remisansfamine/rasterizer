@@ -14,7 +14,7 @@
 #include <iostream>
 #include <algorithm>
 
-int loadTexture(std::vector<Texture>& textures, const char* filePath)
+int scnImpl::loadTexture(const char* filePath)
 {
     std::vector<Texture>::iterator it = std::find_if(textures.begin(), textures.end(),
                                         [filePath](Texture& t)
@@ -35,7 +35,7 @@ int loadTexture(std::vector<Texture>& textures, const char* filePath)
     return textures.size() - 1;
 }
 
-int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess)
+int scnImpl::loadMaterial(float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess)
 {
     Material mat;
     mat.ambientColor  = float4(ambient[0],  ambient[1],  ambient[2], 1.f);
@@ -62,7 +62,7 @@ int loadMaterial(std::vector<Material>& materials, float ambient[3], float diffu
     return materials.size() - 1;
 }
 
-bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<Material>& scnMaterials, std::string filePath, std::string mtlBasedir, float scale = 1.f)
+bool scnImpl::loadObject(Object& object, std::string filePath, std::string mtlBasedir, float scale)
 {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
@@ -79,17 +79,17 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
     if (!err.empty())
         std::cerr << err << std::endl;
 
-    if (!ret)
-        return 0;
+    if (!ret) return 0;
 
     if (!materials.empty())
     {
+        // For each material of the .obj create a mesh with a texture and a material
         for (size_t m = 0; m < materials.size(); m++)
         {
             tinyobj::material_t& mat = materials[m];
 
-            int textureIndex  = loadTexture(scnTextures, (mtlBasedir + mat.diffuse_texname).c_str());
-            int materialIndex = loadMaterial(scnMaterials, mat.ambient, mat.diffuse, mat.specular, mat.emission, mat.shininess);
+            int textureIndex  = loadTexture((mtlBasedir + mat.diffuse_texname).c_str());
+            int materialIndex = loadMaterial(mat.ambient, mat.diffuse, mat.specular, mat.emission, mat.shininess);
 
             object.mesh.push_back(Mesh(textureIndex, materialIndex));
         }
@@ -105,6 +105,7 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
         {
+            // Get current mesh with material id (because the number of mesh is the number of material)
             size_t meshIndex = shapes[s].mesh.material_ids[f];
 
             size_t fv = shapes[s].mesh.num_face_vertices[f];
@@ -145,18 +146,22 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
                     vertice.u = attrib.texcoords[2 * idx.texcoord_index + 0];
                     vertice.v = attrib.texcoords[2 * idx.texcoord_index + 1];
                 }
+                else
+                    vertice.u = vertice.v = 0.f;
 
                 face.vertices[v] = vertice;
             }
 
             index_offset += fv;
 
+            // Check if there is not twice the same vertex for the current triangle (to avoid triangle with 0 as area)
             bool isAccepted = true;
             for (int i = 0; i < 3; i++)
             {
-                if (face.vertices[i].x == face.vertices[(i + 1) % 3].x &&
-                    face.vertices[i].y == face.vertices[(i + 1) % 3].y &&
-                    face.vertices[i].z == face.vertices[(i + 1) % 3].z)
+                int nextIndex = (i + 1) % 3;
+                if (face.vertices[i].x == face.vertices[nextIndex].x &&
+                    face.vertices[i].y == face.vertices[nextIndex].y &&
+                    face.vertices[i].z == face.vertices[nextIndex].z)
                 {
                     isAccepted = false;
                     break;
@@ -171,7 +176,7 @@ bool loadObject(Object& object, std::vector<Texture>& scnTextures, std::vector<M
     return 1;
 }
 
-void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int hRes = 1, int vRes = 1)
+void scnImpl::loadQuad(Object& object, int textureIndex, int materialIndex, int hRes, int vRes)
 {
     Mesh mesh;
     mesh.textureIndex = textureIndex;
@@ -206,7 +211,7 @@ void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int 
     object.mesh.push_back(mesh);
 }
 
-void loadTriangle(Object& object, int textureIndex = -1, int materialIndex = 0)
+void scnImpl::loadTriangle(Object& object, int textureIndex, int materialIndex)
 {
     Mesh mesh;
     mesh.textureIndex = textureIndex;
@@ -259,30 +264,31 @@ scnImpl::scnImpl()
 
     // HERE: Load the scene
     // Setup some vertices to test
-    loadTexture(textures, "assets/inputbilinear.png");
-    loadTexture(textures, "assets/Deathclaw.png");
+    loadTexture("assets/inputbilinear.png");
+    loadTexture("assets/Deathclaw.png");
 
     lights[0].lightPos = { 0.f, 5.f, 0.f, 1.f };
 
     Object obj1({0.f, 0.f, -2.f});
-    loadQuad(obj1, loadTexture(textures, "assets/inputbilinear.png"));
+    loadQuad(obj1, loadTexture("assets/inputbilinear.png"));
     objects.push_back(obj1);
 
     Object obj2;
-    loadObject(obj2, textures, materials, "assets/deathclaw.obj", "assets/", 0.005f);
+    loadObject(obj2, "assets/deathclaw.obj", "assets/", 0.005f);
     objects.push_back(obj2);
 
     Object obj3;
-    loadObject(obj3, textures, materials, "assets/the_noble_craftsman.obj", "assets/");
-    //loadObject(obj3, textures, materials, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
-    objects.push_back(obj3);
+    //loadObject(obj3, "assets/the_noble_craftsman.obj", "assets/");
+    //loadObject(obj3, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
+    //objects.push_back(obj3);
 }
 
+// Unload the scene
 scnImpl::~scnImpl()
 {
+    // Unload each texture
     for (Texture& texture : textures)
         stbi_image_free(texture.data);
-    // HERE: Unload the scene
 }
 
 void editLights(rdrImpl* renderer, scnImpl* scene)
@@ -325,7 +331,7 @@ void editMaterials(scnImpl* scene)
         ImGui::ColorEdit4("Specular", scene->materials[selectedMaterial].specularColor.e, ImGuiColorEditFlags_Float);
         ImGui::ColorEdit4("Emission", scene->materials[selectedMaterial].emissionColor.e, ImGuiColorEditFlags_Float);
 
-        ImGui::DragFloat("shininess", &scene->materials[selectedMaterial].shininess, 0.f);
+        ImGui::DragFloat("shininess", &scene->materials[selectedMaterial].shininess, 0.f, 128.f);
 
         ImGui::TreePop();
     }
@@ -387,25 +393,30 @@ void scnImpl::drawObject(Object object, rdrImpl* renderer)
     }
 }
 
+std::vector<Object> sortObjects(std::vector<Object> objects, const float3& cameraPos)
+{
+    // Sort all objects with their distance to the camera
+    sort(objects.begin(), objects.end(),
+        [cameraPos](const Object& a, const Object& b)
+    {
+        float3 aPos = (a.getModel() * float4 { 0.f, 0.f, 0.f, 1.f }).xyz;
+        float3 bPos = (b.getModel() * float4 { 0.f, 0.f, 0.f, 1.f }).xyz;
+        return sqMagnitude(cameraPos - aPos) > sqMagnitude(cameraPos - bPos);
+    });
+
+    return objects;
+}
+
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
-    rdrSetUniformBool(renderer, UT_STENCIL_TEST, false);
+    //rdrSetUniformBool(renderer, UT_STENCIL_TEST, false);
 
     editLights(renderer, this);
 
     time += deltaTime;
 
-    // Shoud use pos - camera pos
-    // Sort all objects with their distance
-    const float3& camPos = cameraPos;
-    std::vector<Object> sortedObjects = objects;
-    sort(sortedObjects.begin(), sortedObjects.end(),
-    [camPos](const Object& a, const Object& b)
-    {
-        float3 aPos = (a.getModel() * float4 { 0.f, 0.f, 0.f, 1.f }).xyz;
-        float3 bPos = (b.getModel() * float4 { 0.f, 0.f, 0.f, 1.f }).xyz;
-        return sqMagnitude(camPos - aPos) > sqMagnitude(camPos - bPos);
-    });
+    // Sort objects
+    std::vector<Object> sortedObjects = sortObjects(objects, cameraPos);
     
     // Draw all objects
     for (const auto& object : sortedObjects)

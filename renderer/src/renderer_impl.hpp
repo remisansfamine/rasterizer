@@ -75,6 +75,8 @@ struct Uniform
     mat4x4 view;
     mat4x4 projection;
 
+    bool msaa = true;
+
     bool depthTest = true;
 
     bool blending = true;
@@ -115,6 +117,8 @@ struct Framebuffer
     int height;
     float4* colorBuffer;
     float* depthBuffer;
+    float4* msaaColorBuffer;
+    float* msaaDepthBuffer;
 };
 
 struct rdrImpl
