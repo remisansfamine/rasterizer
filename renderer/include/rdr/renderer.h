@@ -38,8 +38,8 @@ enum rdrUniformType
     UT_TIME,            // 1 float
     UT_DELTATIME,       // 1 float
     UT_CAMERA_POS,      // 3 floats
-    UT_GLOBALAMBIENT,   // 4 floats
-    UT_GLOBALCOLOR,     // 4 floats
+    UT_GLOBAL_AMBIENT,   // 4 floats
+    UT_GLOBAL_COLOR,     // 4 floats
     UT_DEPTH_TEST,      // 1 bool
     UT_STENCIL_TEST,    // 1 bool
     UT_USER = 100,

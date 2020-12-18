@@ -116,9 +116,9 @@ struct Framebuffer
     int width;
     int height;
     float4* colorBuffer;
-    float* depthBuffer;
+    float*  depthBuffer;
     float4* msaaColorBuffer;
-    float* msaaDepthBuffer;
+    float*  msaaDepthBuffer;
 };
 
 struct rdrImpl

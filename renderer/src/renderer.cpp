@@ -35,10 +35,10 @@ rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int he
     return renderer;
 }
 
-float4 gammaCorrection(const float4& color, float iGamma)
+void gammaCorrection(float4& color, float iGamma)
 {
     // Return color gamma corrected
-    return
+    color =
     {
         powf(color.r, iGamma),
         powf(color.g, iGamma),
@@ -47,47 +47,78 @@ float4 gammaCorrection(const float4& color, float iGamma)
     };
 }
 
-float4 boxBlur(Framebuffer fb, int index)
+void boxBlur(Framebuffer fb, float4* colorBuffer)
 {
     // Return the 'normalized' sum of a 3x3 pixels grid
     float4 sum =
-        fb.colorBuffer[index - 1 + fb.width] + // Top left
-        fb.colorBuffer[index     + fb.width] + // Top center
-        fb.colorBuffer[index + 1 + fb.width] + // Top right
-        fb.colorBuffer[index - 1           ] + // Mid left
-        fb.colorBuffer[index               ] + // Current pixel
-        fb.colorBuffer[index + 1           ] + // Mid right
-        fb.colorBuffer[index - 1 - fb.width] + // Low left
-        fb.colorBuffer[index     - fb.width] + // Low center
-        fb.colorBuffer[index + 1 - fb.width];  // Low right
+        colorBuffer[ fb.width - 1]   + // Low left
+        colorBuffer[ fb.width]       + // Low center
+        colorBuffer[ fb.width + 1]   + // Low right
+        colorBuffer[-1]             + // Mid left
+        colorBuffer[0]              + // Current pixel
+        colorBuffer[+1]             + // Mid right
+        colorBuffer[-fb.width - 1]  + // Top left
+        colorBuffer[-fb.width]      + // Top center
+        colorBuffer[-fb.width + 1];   // Top right
 
-    return sum / 9.f;
+    *colorBuffer = sum / 9.f;
 }
 
-float4 gaussianBlur(Framebuffer fb, int index)
+void gaussianBlur(Framebuffer fb, float4* colorBuffer)
 {
     // Return the 'normalized' sum of a 3x3 pixels grid applied with some coefficients
     float4 sum =
-              fb.colorBuffer[index - 1 + fb.width] + // Low left
-        2.f * fb.colorBuffer[index     + fb.width] + // Low center
-              fb.colorBuffer[index + 1 + fb.width] + // Low right
-        2.f * fb.colorBuffer[index - 1           ] + // Mid left
-        4.f * fb.colorBuffer[index               ] + // Current pixel
-        2.f * fb.colorBuffer[index + 1           ] + // Mid right
-              fb.colorBuffer[index - 1 - fb.width] + // Top left
-        2.f * fb.colorBuffer[index     - fb.width] + // Top center
-              fb.colorBuffer[index + 1 - fb.width];  // Top right
+              colorBuffer[ fb.width - 1]    + // Low left
+        2.f * colorBuffer[ fb.width]        + // Low center
+              colorBuffer[ fb.width + 1]    + // Low right
+        2.f * colorBuffer[-1]               + // Mid left
+        4.f * colorBuffer[0]                + // Current pixel
+        2.f * colorBuffer[+1]               + // Mid right
+              colorBuffer[-fb.width - 1]    + // Top left
+        2.f * colorBuffer[-fb.width]        + // Top center
+              colorBuffer[-fb.width + 1];     // Top right
 
-    return sum / 16.f;
+    *colorBuffer = sum / 16.f;
+}
+
+void resolveMSAA(Framebuffer& fb)
+{
+    // For each pixel of the frame buffer, interpolate the samples values (color and depth)
+    for (int i = 0; i < fb.width * fb.height; i++)
+    {
+        float4 colorSum = { 0.f, 0.f, 0.f, 0.f };
+        float depthSum = 0.f;
+
+        int msaaIndex = i * NB_SAMPLES;
+
+        for (int k = 0; k < NB_SAMPLES; k++)
+        {
+            colorSum += fb.msaaColorBuffer[msaaIndex + k];
+            depthSum += fb.msaaDepthBuffer[msaaIndex + k];
+        }
+
+        fb.colorBuffer[i] = colorSum / NB_SAMPLES;
+        fb.depthBuffer[i] = depthSum / NB_SAMPLES;
+    }
+
+    // Clear samples buffers
+    memset(fb.msaaColorBuffer, 0.f, fb.width * fb.height * NB_SAMPLES * sizeof(float4));
+    memset(fb.msaaDepthBuffer, 0.f, fb.width * fb.height * NB_SAMPLES * sizeof(float));
 }
 
 void rdrFinish(rdrImpl* renderer)
 { 
     float4* color = renderer->fb.colorBuffer;
-    float4* msaaColor = renderer->fb.msaaColorBuffer;
+
+    #pragma region Resolve MSAA
+
+    if (renderer->uniform.msaa)
+        resolveMSAA(renderer->fb);
+
+    #pragma endregion
 
     #pragma region Box blur, gaussian blur and light bloom post-process effects
-    int offset = 1;
+    const int offset = 1;
 
     for (int i = offset; i < renderer->fb.width - offset; i++)
     {
@@ -95,49 +126,23 @@ void rdrFinish(rdrImpl* renderer)
         {
             int index = i + renderer->fb.width * j;
 
-            float4& currentColor = color[index];
-
             if (renderer->boxBlur)
-                currentColor = boxBlur(renderer->fb, index);
+                boxBlur(renderer->fb, &color[index]);
 
             // Gaussian blur and light bloom
-            if (renderer->gaussianBlur || currentColor.a > 2.5f && renderer->lightBloom)
-                currentColor = gaussianBlur(renderer->fb, index);
+            else if (renderer->gaussianBlur || color[index].a > 2.5f && renderer->lightBloom)
+                gaussianBlur(renderer->fb, &color[index]);
         }
     }
     #pragma endregion
 
-    #pragma region Pixel per pixel post-process
-    for (int i = 0; i < renderer->fb.width; i++)
-    {
-        for (int j = 0; j < renderer->fb.height; j++)
-        {
-            int index = renderer->fb.width * j + i;
+    #pragma region Gamma correction
 
-            float4& currentColor = color[index];
+    // Correct gamma for each pixel of the frame buffer
+    for (int i = 0; i < renderer->fb.width * renderer->fb.height; i++)
+        gammaCorrection(color[i], renderer->iGamma);
 
-            if (renderer->uniform.msaa)
-            {
-                float4 sum = { 0.f, 0.f, 0.f, 0.f };
-
-                int msaaIndex = index * NB_SAMPLES;
-
-                for (int k = 0; k < NB_SAMPLES; k++)
-                    sum += renderer->fb.msaaColorBuffer[msaaIndex + k];
-
-                currentColor = sum / NB_SAMPLES;
-            }
-
-            currentColor = gammaCorrection(currentColor, renderer->iGamma);
-        }
-        
-    }
     #pragma endregion
-
-    float4 clearColor = { 0.f, 0.f, 0.f, 1.f };
-
-    for (size_t i = 0; i < renderer->fb.width * renderer->fb.height * 4; ++i)
-        memcpy(&msaaColor[i], &clearColor, sizeof(float4));
 }
 
 void rdrShutdown(rdrImpl* renderer)
@@ -155,8 +160,8 @@ void rdrSetUniformFloatV(rdrImpl* renderer, rdrUniformType type, float* value)
         case UT_TIME:           renderer->uniform.time = value[0]; break;
         case UT_DELTATIME:      renderer->uniform.deltaTime = value[0]; break;
         case UT_CAMERA_POS:     renderer->uniform.cameraPos = float3{ value[0], value[1], value[2] }; break;
-        case UT_GLOBALAMBIENT:  renderer->uniform.globalAmbient = float4{ value[0], value[1], value[2], value[3] }; break;
-        case UT_GLOBALCOLOR:    renderer->uniform.globalColor = float4{ value[0], value[1], value[2], value[3] }; break;
+        case UT_GLOBAL_AMBIENT:  renderer->uniform.globalAmbient = float4{ value[0], value[1], value[2], value[3] }; break;
+        case UT_GLOBAL_COLOR:    renderer->uniform.globalColor = float4{ value[0], value[1], value[2], value[3] }; break;
         default:;
     }
 }
@@ -280,14 +285,18 @@ void getLightColor(const Uniform& uniform, Varying& varying)
         if (!uniform.lights[i].isEnable)
             continue;
 
+        #pragma region Get light informations (direction, distance)
         const Light& currLight = uniform.lights[i];
 
+        // Get light direction, coordinates * w is to get a point light or a directionnal light depending on w
         float3 lightDir = currLight.lightPos.xyz / currLight.lightPos.w - currLight.lightPos.w * varying.coords;
 
         float  distance = magnitude(lightDir);
 
         lightDir /= distance;
+        #pragma endregion
 
+        #pragma region Get attenuation
         float attenuation;
         if (currLight.lightPos.w == 0.f)
         {
@@ -296,31 +305,59 @@ void getLightColor(const Uniform& uniform, Varying& varying)
         }
         else
         {
+            // Calculate attenuation with c + l * d + q * d²
             attenuation = currLight.constantAttenuation +
                           currLight.linearAttenuation * distance +
                           currLight.quadraticAttenuation * distance * distance;
         }
+        #pragma endregion
 
         float NdotL = dot(lightDir, normal);
 
-        // Ambient
+        #pragma region Get ambient
         ambientColorSum += currLight.ambient / attenuation;
+        #pragma endregion
 
-        // Diffuse
+        #pragma region Get diffuse
         diffuseColorSum += max(0.f, NdotL) * currLight.diffuse / attenuation;
+        #pragma endregion
 
-        // Specular
+        #pragma region Get specular
         float3 R = normalized(2.f * NdotL * normal - lightDir);
         float3 V = normalized(uniform.cameraPos - varying.coords);
 
         varying.specularColor += powf(max(0.f, dot(R, V)), uniform.material.shininess) * currLight.specular / attenuation;
+        #pragma endregion
     }
 
+    #pragma region Get final color without specular
+    // Get the final color after all lighting application except the specular
     varying.shadedColor = uniform.material.ambientColor * (uniform.globalAmbient + ambientColorSum) +
                           uniform.material.diffuseColor * diffuseColorSum +
                           uniform.material.emissionColor;
+    #pragma endregion
 
+    #pragma region Get final specualar color
     varying.specularColor *= uniform.material.specularColor;
+    #pragma endregion
+}
+
+float4 textureFiltering(const rdrTexture& texture, float2 texel)
+{
+    int si = int(texel.s), ti = int(texel.t);
+
+    int index = ti * texture.width + si;
+
+    // Get nearest texels to interpolate their colors
+    const float4 colors[4] =
+    {
+        texture.data[index],  // Top-left
+        texture.data[index + 1],  // Top-right
+        texture.data[index + texture.width],  // Bottom-left
+        texture.data[index + texture.width + 1],  // Bottom-right
+    };
+
+    return bilinear(texel.s - si, texel.t - ti, colors);
 }
 
 float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
@@ -331,6 +368,7 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
 
     const rdrTexture& texture = uniform.texture;
 
+    // Get correct UVs
     float u = wrap01(fragVars.uv.u);
     float v = wrap01(fragVars.uv.v);
 
@@ -339,32 +377,16 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
     float t = texture.height * v;
 
     // Get texel color with tex coords
-    float4 texColor;
     if (uniform.textureFilter == FilterType::BILINEAR)
     {
-        s -= u;
-        t -= v;
-
-        int si = int(s), ti = int(t);
-
-        int index = ti * texture.width + si;
-
-        // Get nearest texels to interpolate their colors
-        const float4 colors[4] =
-        {
-            texture.data[index                    ],  // Top-left
-            texture.data[index                 + 1],  // Top-right
-            texture.data[index + texture.width    ],  // Bottom-left
-            texture.data[index + texture.width + 1],  // Bottom-right
-        };
-
-        texColor = bilinear(s - si, t - ti, colors);
+        // Get the texel after bilinear filtering
+        return textureFiltering(texture, float2(s - u, t - v));
     }
     else
+    {
         // Get the nearest texel
-        texColor = texture.data[int(t) * texture.width + int(s)];
-
-    return texColor;
+        return texture.data[int(t) * texture.width + int(s)];
+    }
 }
 
 bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
@@ -377,9 +399,11 @@ bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
     }
 
     // If the phong model is used, compute the shaded color and the specular for each pixel
+    // Else keep values calculated during the vertex shader
     if (uniform.phongModel)
         getLightColor(uniform, fragVars);
 
+    // Get the new color with lighting modifications
     outColor = getTextureColor(fragVars, uniform) * fragVars.color * fragVars.shadedColor +
                fragVars.specularColor;
 
@@ -408,19 +432,22 @@ Varying interpolateVarying(const Varying varyings[3], const float3& weight)
     return result;
 }
 
-bool getBarycentric(const float4 screenCoords[3], const float2& pixelCoords, float inversedArea, float3& inWeights)
+bool getBarycentric(const float4 screenCoords[3], const float2 edges[3], const float2& pixelCoords, float inversedArea, float3& inWeights)
 {
     // Check if the pixel is in the triangle foreach segment
+    // Using top-left rule to avoid segment overlapping
+
     inWeights.x = getWeight(screenCoords[1].xy, screenCoords[2].xy, pixelCoords) * inversedArea;
-    if (inWeights.x < 0.f)
+    if (inWeights.x == 0.f ? (edges[0].y < 0.f || edges[0].x <= 0.f && edges[0].y == 0.f) : inWeights.x < 0.f)
         return false;
 
     inWeights.y = getWeight(screenCoords[2].xy, screenCoords[0].xy, pixelCoords) * inversedArea;
-    if (inWeights.y < 0.f)
+    if (inWeights.y == 0.f ? (edges[1].y < 0.f || edges[1].x <= 0.f && edges[1].y == 0.f) : inWeights.y < 0.f)
         return false;
 
+    // Avoid a costly operation by using the latest results
     inWeights.z = 1.f - inWeights.x - inWeights.y;
-    if (inWeights.z < 0.f)
+    if (inWeights.z == 0.f ? (edges[2].y < 0.f || edges[2].x <= 0.f && edges[2].y == 0.f) : inWeights.z < 0.f)
         return false;
 
     return true;
@@ -437,24 +464,51 @@ void perspectiveCorrection(const float3 correctionFloats, float3& weight)
     weight *= correctionFloats / interpolateFloat(correctionFloats, weight);
 }
 
+void bend(float4& src, const float4& dest)
+{
+    src = src * max(src.a, 0.f) + dest * (1.f - min(src.a, 1.f));
+}
+
 void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const Varying varying[3], const Uniform& uniform)
 {
-    // Get the bounding box
-    int xMin = min(screenCoords[0].x, min(screenCoords[1].x, screenCoords[2].x));
-    int yMin = min(screenCoords[0].y, min(screenCoords[1].y, screenCoords[2].y));
-    int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
-    int yMax = max(screenCoords[0].y, max(screenCoords[1].y, screenCoords[2].y));
-
-    float area = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
-
     // TODO: Fix area = 0 and black lines
-    if (area == 0.f)
+
+    #pragma region Get bounding boxes
+    int xMin = min(screenCoords[0].x, min(screenCoords[1].x, screenCoords[2].x));
+    int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
+    if (xMin == xMax)
         return;
 
-    float inversedArea = 1.f / area;
-    
+    int yMin = min(screenCoords[0].y, min(screenCoords[1].y, screenCoords[2].y));
+    int yMax = max(screenCoords[0].y, max(screenCoords[1].y, screenCoords[2].y));
+    if (yMin == yMax)
+        return;
+    #pragma endregion
+
+    #pragma region Get area
+    float inversedArea;
+    {
+        float area = getWeight(screenCoords[0].xy, screenCoords[1].xy, screenCoords[2].xy);
+
+        if (area == 0.f)
+            return;
+
+        inversedArea = 1.f / area;
+    }
+    #pragma endregion
+
+    #pragma region Get edges for top-left rule
+    float2 edge[3] =
+    {
+        screenCoords[2].xy - screenCoords[1].xy,
+        screenCoords[0].xy - screenCoords[2].xy,
+        screenCoords[1].xy - screenCoords[0].xy
+    };
+#pragma endregion
+
     float2 fragment;
     float3 weight;
+    float3 currentSampleWeight;
 
     // Foreach pixel in the bounding box
     for (int i = xMin; i <= xMax; i++)
@@ -464,90 +518,130 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
         {
             fragment.y = j + 0.5f;
 
-            // Check if it is in the triangle
-            if (!getBarycentric(screenCoords, fragment, inversedArea, weight))
-                continue;
-            /*{
-                float2 edge0 = screenCoords[2].xy - screenCoords[1].xy;
-                float2 edge1 = screenCoords[0].xy - screenCoords[2].xy;
-                float2 edge2 = screenCoords[1].xy - screenCoords[0].xy;
+            #pragma region Compute samples validity
+            unsigned char sampleBit = 0;
 
-                bool overlaps = true;
+            // Check for each sample if it is in the triangle or not, and put these informations on a bitmask
+            if (uniform.msaa)
+            {
+                float3 sampleWeight[NB_SAMPLES];
+                
+                // Get samples offset on a 4x4 grid (2x2 RGSS)
+                float2 sampleOffset[NB_SAMPLES] =
+                {
+                    { -3.f / 8.f,-1.f / 8.f }, { 1.f / 8.f,-3.f / 8.f },
+                    { -1.f / 8.f, 3.f / 8.f }, { 3.f / 8.f, 1.f / 8.f }
+                };
 
-                // If the point is on the edge, test if it is a top or left edge, 
-                // otherwise test if  the edge function is positive
-                overlaps &= (weight.x == 0 ? ((edge0.y == 0 && edge0.x > 0) || edge0.y > 0) : (weight.x > 0));
-                overlaps &= (weight.y == 0 ? ((edge1.y == 0 && edge1.x > 0) || edge1.y > 0) : (weight.y > 0));
-                overlaps &= (weight.z == 0 ? ((edge2.y == 0 && edge2.x > 0) || edge2.y > 0) : (weight.z > 0));
+                // For each sample of the current pixel, check if it is covered, if it is set the mask and the current weight
+                for (int k = 0, mask = 1; k < NB_SAMPLES; k++, mask <<= 1)
+                {
+                    if (!getBarycentric(screenCoords, edge, fragment + sampleOffset[k], inversedArea, sampleWeight[k]))
+                        continue;
 
-                if (!overlaps)
+                    sampleBit |= mask;
+                    currentSampleWeight = sampleWeight[k];
+                }
+
+                // If there is no sample covered, leave this pixel
+                if (!sampleBit)
                     continue;
-            }*/
+            }
+            #pragma endregion
+
+            #pragma region Compute centroid validity
+            // Check if the centroid is in the triangle, if MSAA is active, set the new fragment weight else leave the pixel
+            if (!getBarycentric(screenCoords, edge, fragment, inversedArea, weight))
+            {
+                if (!uniform.msaa)
+                    continue;
+
+                weight = currentSampleWeight;
+            }
+            #pragma endregion
 
             int fbIndex = j * fb.width + i;
 
-            // Depth test
-            float z, *zBuffer = nullptr;
+            #pragma region Depth test
+            // Keep z in memory to set it after alpha test
+            float z;
             if (uniform.depthTest)
             {
                 z = interpolateFloat({ screenCoords[0].z, screenCoords[1].z, screenCoords[2].z }, weight);
 
-                zBuffer = &fb.depthBuffer[fbIndex];
-
                 // If there is a closer pixel drawn at the same screen coords, discard
-                if (*zBuffer >= z)
+                if (fb.depthBuffer[fbIndex] >= z)
                     continue;
             }
+            #pragma endregion
 
-            // Perspective correction
+            #pragma region Perspective correction
+
             if (uniform.perspectiveCorrection)
                 perspectiveCorrection({ screenCoords[0].w, screenCoords[1].w, screenCoords[2].w }, weight);
 
+            #pragma endregion
+
+            #pragma region Get fragment color
             // Get the varying of the current pixel
             Varying fragVarying = interpolateVarying(varying, weight);
 
             float4 fragColor;
             if (!fragmentShader(fragVarying, uniform, fragColor))
                 continue;
+            #pragma endregion
 
-            // If the cutout permit it, write in the depthBuffer
-            if (zBuffer && alphaTest(uniform, fragColor.a))
-                *zBuffer = z;
-
-            // If there is blending, get the last pixel in the colorBuffer and add it to the fragment color
-            if (uniform.blending && fragColor.a < 1.f)
-                fragColor = fragColor * max(fragColor.a, 0.f) + fb.colorBuffer[fbIndex] * (1.f - min(fragColor.a, 1.f));
-
+            #pragma region Set the depth and the fragment color to valid samples
             if (uniform.msaa)
             {
-                int msaaIndex = fbIndex * NB_SAMPLES;
+                int     msaaIndex = fbIndex * NB_SAMPLES;
+                float*  msaaZBuffer = &fb.msaaDepthBuffer[msaaIndex];
+                float4* msaaColorBuffer = &fb.msaaColorBuffer[msaaIndex];
 
-                float3 sampleWeight;
-                /*float2 sampleOffset = { 0.25f, 0.25f };
-                for (int k = 0; k < NB_SAMPLES; k++)
+                // For each covered sample set the depth, get the bended color and set it to the current sample
+                for (int k = 0, mask = 1; k < NB_SAMPLES; k++, mask <<= 1)
                 {
-                    sampleOffset.x *= -1.f;
-                    sampleOffset.y = sign(k - NB_SAMPLES / 2);
+                    if (sampleBit & mask)
+                    {
+                        // Set the sample color, to avoid changes on the fragment color during bending
+                        float4 sampleColor = fragColor;
 
-                    if (!getBarycentric(screenCoords, fragment + sampleOffset, inversedArea, sampleWeight))
-                        continue;
+                        // If there is blending, get the last sample in the sampleColorBuffer and add it to the sample color
+                        if (uniform.blending && sampleColor.a < 1.f)
+                            bend(sampleColor, msaaColorBuffer[k]);
 
-                    fb.msaaColorBuffer[msaaIndex + k] = fragColor;
-                }*/
-                if (getBarycentric(screenCoords, fragment + float2{-0.25f,-0.25f }, inversedArea, sampleWeight))
-                    fb.msaaColorBuffer[msaaIndex + 0] = fragColor;
+                        if (uniform.depthTest)
+                        {
+                            // Check if there is already a closer sample
+                            if (msaaZBuffer[k] >= z)
+                                continue;
 
-                if (getBarycentric(screenCoords, fragment + float2{ 0.25f,-0.25f }, inversedArea, sampleWeight))
-                    fb.msaaColorBuffer[msaaIndex + 1] = fragColor;
+                            if (alphaTest(uniform, sampleColor.a))
+                                msaaZBuffer[k] = z;
+                        }
 
-                if (getBarycentric(screenCoords, fragment + float2{-0.25f, 0.25f }, inversedArea, sampleWeight))
-                    fb.msaaColorBuffer[msaaIndex + 2] = fragColor;
-
-                if (getBarycentric(screenCoords, fragment + float2{ 0.25f, 0.25f }, inversedArea, sampleWeight))
-                    fb.msaaColorBuffer[msaaIndex + 3] = fragColor;
+                        msaaColorBuffer[k] = sampleColor;
+                    }
+                }
             }
-            else 
-                fb.colorBuffer[fbIndex] = fragColor;
+            #pragma endregion
+
+            #pragma region Set the depth and the fragment color to the valid pixel
+            else
+            {
+                float4* colorBuffer = &fb.colorBuffer[fbIndex];
+
+                // If there is blending, get the last pixel in the colorBuffer and add it to the fragment color
+                if (uniform.blending && fragColor.a < 1.f)
+                    bend(fragColor, *colorBuffer);
+
+                // If the cutout permit it, write in the depthBuffer
+                if (uniform.depthTest && alphaTest(uniform, fragColor.a))
+                    fb.depthBuffer[fbIndex] = z;
+
+                *colorBuffer = fragColor;
+            }
+            #pragma endregion
         }
     }
 }
@@ -641,20 +735,24 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
         const clipPoint* currentVertex  = &outputCoords[0];
         const clipPoint* previousVertex = &outputCoords[finalPointCount - 1];
 
+        #pragma region Get current axis informations
         // Get axis index and axis sign (-1, 0, 1)
         int axis = i < 4 ? i : i - 4;
         int axisSign = sign(i - 3);
+        #pragma endregion
 
         // Compute previous clipcode for the first point and the current axis value
         unsigned char   prevCode  = computeClipOutcodes(previousVertex->coords) & plane;
         float           prevValue = previousVertex->coords.w + axisSign * previousVertex->coords.e[axis];
 
+        #pragma region Traverse the points of the triangle
         while (currentVertex != &outputCoords[finalPointCount])
         {
             // Compute current clipcode and the current axis value
             unsigned char   currCode  = computeClipOutcodes(currentVertex->coords) & plane;
             float           currValue = currentVertex->coords.w + axisSign * currentVertex->coords.e[axis];
 
+            #pragma region Get intersection
             // Check if only one point is outside the plane
             if (currCode ^ prevCode)
             {
@@ -669,18 +767,22 @@ int clipTriangle(clipPoint outputCoords[9], unsigned char outputCodes)
                     lerp(previousVertex->weights, currentVertex->weights, lerpFactor)
                 };
             }
+            #pragma endregion
 
             //Insert current vertex at the end of the array if it is inside the plane 
             if (!currCode)
                 currentVertices[currentVertCount++] = *currentVertex;
 
+            #pragma region Go to another vertex
             // Set the previous vertex values with the current ones
-            prevCode  = currCode;
+            prevCode = currCode;
             prevValue = currValue;
 
             //Move forward (set previous vertex and get next vertex)
             previousVertex = currentVertex++;
+            #pragma endregion
         }
+        #pragma endregion
 
         // Change the output coords and the count of vertex
         memcpy(outputCoords, currentVertices, sizeof(clipPoint) * currentVertCount);
