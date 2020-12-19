@@ -10,8 +10,18 @@ CPU Rendering library written in C++ 17 for C/C++ and scene loader (using stb, T
 CPU Renderer using rasterization to display 3D models in a color buffer
 (Use glfw and ImGui)
 
-Features
+
+Renderer table of Contents
 ===
+1. [Features](#rdrfeatures)
+2. [Usage](#rdrusage)
+3. [How does it work ?](#rdrexplications)
+4. [Exemples and references](#rdrexemples)
+
+
+<div id='rdrfeatures' />
+
+# Features
 * Draw triangles on the input color buffer using input vertices
 * Triangle wireframe
 * Triangle rasterization
@@ -22,10 +32,11 @@ Features
 * Lighting support using Gouraud and Phong models (ambient, diffuse, specular and attenuation)
 * Blending support (+ texture with transparence and cutout)
 * Gamma correction
-* Post-process effect (Box blur, Gaussian blur and Light bloom)
+* Post-process effect (Box blur, Gaussian blur, Light bloom, MSAA)
 
-Usage
-===
+<div id='rdrusage' />
+
+# Usage
 Initialization
 ---
 ```c++
@@ -58,41 +69,72 @@ Shutdown
 ```c++
 void rdrShutdown(rdrImpl* renderer)
 ```
+<div id='rdrexplications' />
 
-How does it work ?
-===
+# How does it work ?
+
+Summary
+---
+1. [Vertex shader](#vshader)
+2. [Clipping](#clipping)
+3. [Normalized Device Coordinates](#ndc)
+4. [Screen coordinates](#screencoords)
+5. [Rasterization](#rasterization)
+6. [Pixel shader](#pshader)
+7. [Blending](#blending)
+8. [Post-process](#post-process)
+
+<div id='vshader' />
+
 Vertex shader
 ---
-First of all, the renderer takes the input vertices and applies the vertex shader to them. The vertex shader compute the clip coordinates (which are homogeneous) with the Model-View-Projection matrix (it also applies the Model matrix to the normals and the local coordinates). It saves the vertex informations (like colors and UVs) in a varying (fore ach vertex) for further operations and calculates lighting.
+First of all, the renderer takes the input vertices and applies the vertex shader to them. The vertex shader compute the clip coordinates (which are homogeneous) with the Model-View-Projection matrix (it also applies the Model matrix to the normals and the local coordinates). It saves the vertex informations (like colors and UVs) in a varying (for each vertex) for further operations and to calculate lighting.
+
+<div id='clipping' />
 
 Outcodes and outpoints computing - Clipping
 ---
-After that the pipeline calls two functions to check if the current triangle needs to be clipped, and how to clip it. If it shoulds be clipped, it adds new triangle to rasterize with new varying (for each vertex) values.
+After that the pipeline calls two functions to check if the current triangle needs to be clipped, and how to clip it. If it shoulds be clipped, it adds new triangles to rasterize with new varyings (for each vertex).
+
+<div id='ndc' />
 
 Normalized Device Coordinates
 ---
 Then the renderer divides the homogeneous coordinates by their w component to get NDC coordinates (which are between -1 and 1). With these coordinates the renderer can ignore some faces (like back faces) using the normal of the triangle's face.
 
+<div id='screencoords' />
+
 Screen coordinates
 ---
 NDC coordinates are then remapped with the viewport definition, and the varyings are interpolated with the weights of clipped coordinates. With these remapped coordinates and the interpolated varyings the main function can finally rasterize the clipped triangles (or draw them as lines with the Wireframe mode).
 
+<div id='rasterization' />
+
 Rasterization
 ---
-At the start of this step the bounding boxe of the input triangle is calculated. For each of its pixel, his weight is computed to check if it is in the triangle or not. After passing this test, the depth test should be passed, it checks if there is already a pixel drawn in the color buffer at his position and if his depth is greater than its own. Then the perspective correction is occured to avoid PS1 graphics-like and get correct weights to interpolate varyings. 
+At the start of this step the bounding boxe of the current triangle is calculated. For each of its pixel, his weight is computed to check if it is in the triangle or not (If MSAA is enabled, this step uses the samples of the pixel instead of using the pixel centroid). After passing this test, the depth test should be passed, it checks if there is already a pixel drawn in the color buffer at his position and if his depth is greater than its own. Then the perspective correction is occured to avoid PS1 graphics-like and get correct weights to interpolate varyings. 
+
+<div id='pshader' />
 
 Pixel shader
-===
-After getting varyings 
+---
+After getting the interpolate varying, the fragment shader is called. The fragment shader calculates the pixel color using the differents values of the inputs. The lighting can be calculated here (If the Phong model is enabled, else it is calculates during Vertex shader). If the current triangle is textured, the fragment shader get the appropriate color using the UVs (It can also filter the texture using bilinear . interpolation). The fragment shader can also discard pixels depending on its settings.
+
+<div id='blending' />
 
 Blending
-===
+---
+After getting the fragment color, the blending can be applied with the old color of the pixel to have a transparency effect. Then the alpha test should be passed to write in the depth buffer (to avoid non-transparent face due to the rendering order of the vertices). These two steps are applied to each sample of the current pixel if the MSAA is enabled. After these steps the buffers (color buffer or MSAA color buffer) can be filled with the blended color.
+
+<div id='post-process' />
 
 Post-process
-===
-The final step is 
+---
+The final step is to apply effects on the frame buffer after getting all pixels (or of the samples) color, by traversing all the pixels of the frame buffer. If the MSAA is enabled, no pixel has a color, this color is obtained by calculating the average color of all samples of the current pixel. Then others effects can be applied like Box blur, Gaussian blur or Light bloom. These effects are applied by obtaining the average of pixels around the current one with some factors. At the very end, the frame buffer is traversed once more to apply the gamma correction.
 
+<div id='rdrexemples' />
 
+# Exemples and references
 
 ***Scene***
 ===
@@ -140,8 +182,7 @@ int  loadTexture(...)
 void loadTriangle(...)
 ```
 
-Data format
-===
+# Data format
 
 Mesh
 ===

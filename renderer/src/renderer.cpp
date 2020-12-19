@@ -464,7 +464,7 @@ void perspectiveCorrection(const float3 correctionFloats, float3& weight)
     weight *= correctionFloats / interpolateFloat(correctionFloats, weight);
 }
 
-void bend(float4& src, const float4& dest)
+void blend(float4& src, const float4& dest)
 {
     src = src * max(src.a, 0.f) + dest * (1.f - min(src.a, 1.f));
 }
@@ -527,6 +527,15 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
                 float3 sampleWeight[NB_SAMPLES];
                 
                 // Get samples offset on a 4x4 grid (2x2 RGSS)
+                //    +-----------+
+                //    |  |  |A |  |
+                //    |--|--|--|--|
+                //    |D |  |  |  |
+                //    |--|--|--|--|
+                //    |  |  |  |B |
+                //    |--|--|--|--|
+                //    |  |C |  |  |
+                //    +-----------+
                 float2 sampleOffset[NB_SAMPLES] =
                 {
                     { -3.f / 8.f,-1.f / 8.f }, { 1.f / 8.f,-3.f / 8.f },
@@ -598,17 +607,17 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
                 float*  msaaZBuffer = &fb.msaaDepthBuffer[msaaIndex];
                 float4* msaaColorBuffer = &fb.msaaColorBuffer[msaaIndex];
 
-                // For each covered sample set the depth, get the bended color and set it to the current sample
+                // For each covered sample set the depth, get the blended color and set it to the current sample
                 for (int k = 0, mask = 1; k < NB_SAMPLES; k++, mask <<= 1)
                 {
                     if (sampleBit & mask)
                     {
-                        // Set the sample color, to avoid changes on the fragment color during bending
+                        // Set the sample color, to avoid changes on the fragment color during blending
                         float4 sampleColor = fragColor;
 
                         // If there is blending, get the last sample in the sampleColorBuffer and add it to the sample color
                         if (uniform.blending && sampleColor.a < 1.f)
-                            bend(sampleColor, msaaColorBuffer[k]);
+                            blend(sampleColor, msaaColorBuffer[k]);
 
                         if (uniform.depthTest)
                         {
@@ -633,7 +642,7 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
 
                 // If there is blending, get the last pixel in the colorBuffer and add it to the fragment color
                 if (uniform.blending && fragColor.a < 1.f)
-                    bend(fragColor, *colorBuffer);
+                    blend(fragColor, *colorBuffer);
 
                 // If the cutout permit it, write in the depthBuffer
                 if (uniform.depthTest && alphaTest(uniform, fragColor.a))
