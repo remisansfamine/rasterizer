@@ -34,7 +34,7 @@ struct Object
     std::vector<Mesh> mesh;
     float3 position = { 0.f, 0.f, 0.f };
     float3 rotation = { 0.f, 0.f, 0.f };
-    float3 scale = { 1.f, 1.f, 1.f };
+    float3 scale    = { 1.f, 1.f, 1.f };
 
     mat4x4 model = mat4::identity();
 
@@ -42,7 +42,10 @@ struct Object
         : position(pos), rotation(rot), scale(scale) {}
 
     // Return the object model with his transform
-    mat4x4 getModel() const { return mat4::rotateX(rotation.x) * mat4::rotateY(rotation.y) * mat4::rotateZ(rotation.z) * mat4::translate(position) * mat4::scale(scale); }
+    mat4x4 getModel() const
+    {
+        return mat4::translate(position) * mat4::rotateX(rotation.x) * mat4::rotateY(rotation.y) * mat4::rotateZ(rotation.z) * mat4::scale(scale);
+    }
 };
 
 struct Light

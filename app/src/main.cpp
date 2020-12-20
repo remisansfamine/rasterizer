@@ -48,7 +48,7 @@ static GLFWwindow* initWindow(int width, int height, const char* title)
     }
 
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-    GLFWwindow* window = glfwCreateWindow(width, height, "GLFW test", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(width, height, "Software renderer", nullptr, nullptr);
     if (window == nullptr)
     {
         printf("glfwCreateWindow failed\n");
@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
 
     // Create renderer framebuffer (color+depth+opengl texture)
     // We need an OpenGL texture to display the result of the renderer to the screen
-    Framebuffer framebuffer(800, 400);
+    Framebuffer framebuffer(400, 200);
 
     // Init renderer
     rdrImpl* renderer = rdrInit(
@@ -249,7 +249,7 @@ int main(int argc, char* argv[])
         ImGui::Begin("Framebuffer");
         ImGui::Text("(Right click to capture mouse, Esc to un-capture)");
         // Display framebuffer (renderer output)
-        ImGui::Image((ImTextureID)(size_t)framebuffer.getColorTexture(), { (float)framebuffer.getWidth(), (float)framebuffer.getHeight() });
+        ImGui::Image((ImTextureID)(size_t)framebuffer.getColorTexture(), { (float)framebuffer.getWidth() * 2, (float)framebuffer.getHeight() * 2});
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
         {
             mouseCaptured = true;

@@ -106,7 +106,7 @@ bool scnImpl::loadObject(Object& object, std::string filePath, std::string mtlBa
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
         {
             // Get current mesh with material id (because the number of mesh is the number of material)
-            size_t meshIndex = shapes[s].mesh.material_ids[f];
+            int meshIndex = max(0, shapes[s].mesh.material_ids[f]);
 
             size_t fv = shapes[s].mesh.num_face_vertices[f];
                  
@@ -262,25 +262,25 @@ scnImpl::scnImpl()
 {
     stbi_set_flip_vertically_on_load(1);
 
-    // HERE: Load the scene
-    // Setup some vertices to test
-    loadTexture("assets/inputbilinear.png");
-    loadTexture("assets/Deathclaw.png");
+    lights[0].isEnable = true;
+    lights[0].diffuse = { 1.f, 0.f, 0.f, 1.f };
+    lights[0].lightPos = { -5.f, 5.f, 0.f, 1.f };
 
-    lights[0].lightPos = { 0.f, 5.f, 0.f, 1.f };
+    lights[1].isEnable = true;
+    lights[1].diffuse = { 0.f, 0.f, 1.f, 1.f };
+    lights[1].lightPos = { 5.f, -5.f, 0.f, 1.f };
 
-    Object obj1({0.f, 0.f, -2.f});
-    loadQuad(obj1, loadTexture("assets/inputbilinear.png"));
+    lights[2].isEnable = true;
+    lights[2].diffuse = { 0.f, 1.f, 0.f, 1.f };
+    lights[2].lightPos = { 0.f, 2.5f, -5.f, 1.f };
+
+    Object obj0({ 0.f, -3.f, -10.f });
+    loadObject(obj0, "assets/christmas-tree/christmas-tree.obj", "assets/christmas-tree/");
+    objects.push_back(obj0);
+
+    Object obj1({ 0.f, 0.f, -0.5f });
+    loadQuad(obj1, loadTexture("assets/window.png"));
     objects.push_back(obj1);
-
-    Object obj2;
-    loadObject(obj2, "assets/deathclaw.obj", "assets/", 0.005f);
-    objects.push_back(obj2);
-
-    Object obj3;
-    //loadObject(obj3, "assets/the_noble_craftsman.obj", "assets/");
-    //loadObject(obj3, "assets/sponza-master/sponza.obj", "assets/sponza-master/", 0.005f);
-    //objects.push_back(obj3);
 }
 
 // Unload the scene
@@ -312,8 +312,6 @@ void editLights(rdrImpl* renderer, scnImpl* scene)
         ImGui::SliderFloat("Constant attenuation", &scene->lights[selectedLight].constantAttenuation, 0.f, 10.f);
         ImGui::SliderFloat("Linear attenuation", &scene->lights[selectedLight].linearAttenuation, 0.f, 10.f);
         ImGui::SliderFloat("Quadratic attenuation", &scene->lights[selectedLight].quadraticAttenuation, 0.f, 10.f);
-
-        rdrSetUniformLight(renderer, selectedLight, (rdrLight*)&scene->lights[selectedLight]);
 
         ImGui::TreePop();
     }
@@ -409,11 +407,16 @@ std::vector<Object> sortObjects(std::vector<Object> objects, const float3& camer
 
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
-    //rdrSetUniformBool(renderer, UT_STENCIL_TEST, false);
-
     editLights(renderer, this);
 
+    for (int i = 0; i < IM_ARRAYSIZE(lights); i++)
+        rdrSetUniformLight(renderer, i, (rdrLight*)&lights[i]);
+
+
     time += deltaTime;
+
+    objects[0].rotation.y = time * 0.25f;
+
 
     // Sort objects
     std::vector<Object> sortedObjects = sortObjects(objects, cameraPos);
