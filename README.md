@@ -2,7 +2,7 @@ Rasterization rendering
 ===
 CPU Rendering library written in C++ 17 for C/C++ and scene loader (using stb, TinyObjLoader, glfw and ImGui) accompanied by a mathematics library.
 
-**/!\\ CPU Renderers are not performant nor efficient, it is not recommended to use them on a serious project. Use it at your own risk. /!\\**
+**/!\\ CPU Software renderers are not performant nor efficient, it is not recommended to use them on a serious project. Use it at your own risk. /!\\**
 
 ***Renderer***
 ===

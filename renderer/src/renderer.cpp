@@ -351,10 +351,10 @@ float4 textureFiltering(const rdrTexture& texture, float2 texel)
     // Get nearest texels to interpolate their colors
     const float4 colors[4] =
     {
-        texture.data[index],  // Top-left
-        texture.data[index + 1],  // Top-right
-        texture.data[index + texture.width],  // Bottom-left
-        texture.data[index + texture.width + 1],  // Bottom-right
+        texture.data[index],                        // Top-left
+        texture.data[index + 1],                    // Top-right
+        texture.data[index + texture.width],        // Bottom-left
+        texture.data[index + texture.width + 1],    // Bottom-right
     };
 
     return bilinear(texel.s - si, texel.t - ti, colors);
@@ -531,7 +531,7 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
                 //    |  |  |A |  |
                 //    |--|--|--|--|
                 //    |D |  |  |  |
-                //    |--|--|--|--|
+                //    |--|--X--|--|
                 //    |  |  |  |B |
                 //    |--|--|--|--|
                 //    |  |C |  |  |
