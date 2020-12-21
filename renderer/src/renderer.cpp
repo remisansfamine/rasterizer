@@ -357,6 +357,7 @@ float4 textureFiltering(const rdrTexture& texture, float2 texel)
         texture.data[index + texture.width + 1],    // Bottom-right
     };
 
+    // Interpolate the colors array
     return bilinear(texel.s - si, texel.t - ti, colors);
 }
 
@@ -479,8 +480,6 @@ void blend(float4& src, const float4& dest)
 
 void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const Varying varying[3], const Uniform& uniform)
 {
-    // TODO: Fix area = 0 and black lines
-
     #pragma region Get bounding boxes
     int xMin = min(screenCoords[0].x, min(screenCoords[1].x, screenCoords[2].x));
     int xMax = max(screenCoords[0].x, max(screenCoords[1].x, screenCoords[2].x));
@@ -724,6 +723,12 @@ bool faceCulling(const float3 ndcCoords[3], FaceOrientation orientation, FaceTyp
 unsigned char computeClipOutcodes(const float4 clipCoords)
 {
     unsigned char code = 0;
+
+    // +---+--------+--------+--------+--------+---------+-------+-------+
+    // | 0 |    0   |    0   |    0   |    0   |    0    |   0   |   0   |
+    // | . | z = -w | y = -w | x = -w | 0 < -w |  z = w  | y = w | x = w |
+    // | . |  near  | bottom |  left  |    .   | forward |  top  | right |
+    // +---+--------+--------+--------+--------+---------+-------+-------+
 
     for (int i = 0; i < 8; i++)
     {

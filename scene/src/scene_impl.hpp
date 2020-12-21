@@ -77,7 +77,6 @@ struct scnImpl
     scnImpl();
     ~scnImpl();
 
-
     std::vector<Object> objects;
     std::vector<Texture> textures;
 
@@ -88,22 +87,27 @@ struct scnImpl
 
     float3 cameraPos = { 0.f, 0.f, 0.f };
 
-
-
-
-
     void update(float deltaTime, rdrImpl* renderer);
 
     void showImGuiControls();
 
     private:
+        // Draw each object in the list and call rendering functions (like rdrSetTexture...)
         void drawObject(Object object, rdrImpl* renderer);
 
+        // Create a new texture loaded by stb using the input filepath (return the index of the texture in the list) 
         int  loadTexture(const char* filePath);
+
+        // Create a new material using the input values (return the index of the material in the list)
         int  loadMaterial(float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess);
 
+        // Add to the input object several meshes loaded by TinyObjLoader using the input filepath
         bool loadObject(Object& object, std::string filePath, std::string mtlBasedir, float scale = 1.f);
+
+        // Add to the input object a quad mesh with a customizable subdivision, a texture and a material
         void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int hRes = 1, int vRes = 1);
+
+        // Add to the input object a triangle mesh with a texture and a material
         void loadTriangle(Object& object, int textureIndex = -1, int materialIndex = 0);
 
         double time = 0.0;

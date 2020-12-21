@@ -1,15 +1,22 @@
 Rasterization rendering
 ===
-CPU Rendering library written in C++ 17 for C/C++ and scene loader (using stb, TinyObjLoader, glfw and ImGui) accompanied by a mathematics library.
+CPU Rendering library written in C++ 17 for C/C++ with a scene loader (using stb, TinyObjLoader, GLFW and ImGui) accompanied by a mathematics library.
 
 **/!\\ CPU Software renderers are not performant nor efficient, it is not recommended to use them on a serious project. Use it at your own risk. /!\\**
+
+Global summary
+===
+1. [Renderer](#rdr)
+2. [Scene](#scene)
+3. [Global](#global)
+
+<div id='rdr'/>
 
 ***Renderer***
 ===
 **_Description:_**
 CPU Renderer using rasterization to display 3D models in a color buffer
-(Use glfw and ImGui)
-
+(Use GLFW and ImGui)
 
 Renderer table of Contents
 ===
@@ -18,8 +25,9 @@ Renderer table of Contents
 3. [How does it work ?](#rdrexplications)
 4. [Exemples](#rdrexemples)
 5. [References](#rdrreferences)
+6. [Know bugs](#rdrbugs)
 
-<div id='rdrfeatures' />
+<div id='rdrfeatures'/>
 
 # Features
 * Draw triangles on the input color buffer using input vertices
@@ -137,7 +145,11 @@ The final step is to apply effects on the frame buffer after getting all pixels 
 # Exemples
 <div style="text-align:center">
 
-![Lighting](/annexes/lighting.gif)
+![Diffuse](/annexes/diffuse.gif)
+
+Colored diffuse using Phong shading.
+
+![Specular](/annexes/specular.gif)
 
 Lighting using Gouraud and Phong shading: diffuse, specular, emissive and attenuation.
 
@@ -168,7 +180,7 @@ Viewport:
 - Gives the formula to convert normalized device coordinates to viewport coordinates (here the viewport is the screen): https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glViewport.xhtml
 
 Rasterization:
-- Shows how to check if the current pixel is in the triangle and how to use the top-left rule: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage
+- Shows how the triangle rasterization works and how to use the top-left rule: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage
 
 Perspective correction:
 - Shows the technique to correct the perspective: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/perspective-correct-interpolation-vertex-attributes
@@ -180,7 +192,7 @@ Lighting:
 - Shows the differences between Gouraud shading and Phong shading: https://en.wikipedia.org/wiki/Gouraud_shading
 - Shows the principle of Phong shading: https://en.wikipedia.org/wiki/Phong_shading
 - Gives an alternative to the Phong model: https://en.wikipedia.org/wiki/Blinn%E2%80%93Phong_reflection_model
-- Gives the formula of the Phong shading: https://en.wikipedia.org/wiki/Phong_reflection_model
+- Gives the formulas for the Phong shading: https://en.wikipedia.org/wiki/Phong_reflection_model
 - Shows how OpenGL uses its light systeme and how materials and light are related: https://www.glprogramming.com/red/chapter05.html
 
 Blending:
@@ -202,15 +214,26 @@ MSAA:
 - Shows the principle of anti-aliasing: https://docs.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-rasterizer-stage-rules
 - Shows how to arrange samples: https://mynameismjp.wordpress.com/2012/10/24/msaa-overview/
 
+<div id='rdrbugs'/>
+
+# Known bugs
+- Sometimes lines may appear on some models, for example if the camera is in (0;0;0) and it does not move.
+- On small resolutions the accuracy of the rasterization is not perfect.
+- Models with incorrect information can cause crashes.
+- MSAA can prevent cutout (alpha test) from working if blending is enabled.
+- Phong shading can be more performant than Gouraud shading.
+- Box blur, Gaussian blur and Light bloom may not work properly.
+
+<div id='scene'/>
+
 ***Scene***
 ===
-**_Description:_** Default scene program to load .obj, textures and materials editable via ImGui
+**_Description:_** Default scene program to load .obj, textures and materials editable via ImGui, and then display them using the rendering software.
 (Use stb, TinyObjLoader and ImGui)
 
 1. [Features](#scenefeatures)
 2. [Usage](#sceneusage)
 3. [Data format](#scenedataformat)
-
 
 <div id='scenefeatures'/>
 
@@ -277,8 +300,36 @@ vector of Mesh      | List of mesh that all have the same transform
 3 floats -> x, y, z | Scale
 ```
 
+<div id='global'/>
+
 ***Shared informations*** (Renderer and scene)
 ===
+
+Third-party programs and libraries
+===
+stb
+---
+https://github.com/nothings/stb
+
+TinyObjLoader
+---
+https://github.com/tinyobjloader/tinyobjloader
+
+GLFW
+---
+https://www.glfw.org/
+
+Glad
+---
+https://glad.dav1d.de/
+
+ImGui
+---
+https://github.com/ocornut/imgui
+
+msf_gif
+---
+https://github.com/notnullnotvoid/msf_gif
 
 Data format
 ===

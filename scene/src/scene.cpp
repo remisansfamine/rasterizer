@@ -25,7 +25,7 @@ int scnImpl::loadTexture(const char* filePath)
     if (it != textures.end())
         return it - textures.begin();
 
-    // Else add load a new texture with stb and return the new index, if the loaded texture is valid
+    // Else add load a new texture with stb and return the new index, only if the loaded texture is valid
 
     Texture texture;
     texture.fileName = filePath;
@@ -42,8 +42,8 @@ int scnImpl::loadTexture(const char* filePath)
 int scnImpl::loadMaterial(float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess)
 {
     Material mat;
-    mat.ambientColor  = float4(ambient[0],  ambient[1],  ambient[2], 1.f);
-    mat.diffuseColor  = float4(diffuse[0],  diffuse[1],  diffuse[2], 1.f);
+    mat.ambientColor  = float4(ambient[0],  ambient[1],  ambient[2],  1.f);
+    mat.diffuseColor  = float4(diffuse[0],  diffuse[1],  diffuse[2],  1.f);
     mat.specularColor = float4(specular[0], specular[1], specular[2], 1.f);
     mat.emissionColor = float4(emissive[0], emissive[1], emissive[2], 0.f);
     mat.shininess = shininess;
@@ -290,7 +290,7 @@ scnImpl::scnImpl()
     objects.push_back(obj0);
 
     Object obj1({ 0.f, 0.f, -0.5f });
-    loadQuad(obj1, loadTexture("assets/window.png"));
+    loadQuad(obj1, loadTexture("assets/window.png"), 0, 2, 2);
     objects.push_back(obj1);
 
     Object obj2({ 0.f, 0.f, -15.f }, { 0.f, M_PI_2, 0.f });
