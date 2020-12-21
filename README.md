@@ -16,8 +16,8 @@ Renderer table of Contents
 1. [Features](#rdrfeatures)
 2. [Usage](#rdrusage)
 3. [How does it work ?](#rdrexplications)
-4. [Exemples and references](#rdrexemples)
-
+4. [Exemples](#rdrexemples)
+5. [References](#rdrreferences)
 
 <div id='rdrfeatures' />
 
@@ -134,23 +134,51 @@ The final step is to apply effects on the frame buffer after getting all pixels 
 
 <div id='rdrexemples' />
 
-# Exemples and references
+# Exemples
+<div style="text-align:center">
+
+![Lighting](/annexes/lighting.gif)
+
+Lighting using Gouraud and Phong shading: diffuse, specular, emissive and attenuation.
+
+![Blending](/annexes/blending.gif)
+
+Blending using a transparent texture.
+
+![Face culling](/annexes/face_cull.gif)
+
+Configurable face culling and perspective correction.
+
+</div>
+
+<div id='rdrreferences' />
+
+# References
+
 
 ***Scene***
 ===
 **_Description:_** Default scene program to load .obj, textures and materials editable via ImGui
 (Use stb, TinyObjLoader and ImGui)
 
-Features
-===
-* Load .obj (support textures and materials), quads and triangles
+1. [Features](#scenefeatures)
+2. [Usage](#sceneusage)
+3. [Data format](#scenedataformat)
+
+
+<div id='scenefeatures' />
+
+# Features
+* Load .obj (support textures and materials), quads and triangles with TinyObjLoader
 * Load textures
 * Load materials
 * Sort models with their transform
 * Fully editable lights, materials and objects from ImGui window
 * Manage the function calls to the renderer
 
-Usage
+<div id='sceneusage' />
+
+# Usage
 ===
 Initialization
 ---
@@ -181,6 +209,8 @@ int  loadMaterial(...)
 int  loadTexture(...)
 void loadTriangle(...)
 ```
+
+<div id='scenedataformat' />
 
 # Data format
 

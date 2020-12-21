@@ -391,6 +391,14 @@ float4 getTextureColor(const Varying& fragVars, const Uniform& uniform)
 
 bool fragmentShader(Varying& fragVars, const Uniform& uniform, float4& outColor)
 {
+    if (uniform.pixelEffect)
+    {
+        if (fmodf(abs(fragVars.coords.x), 1.f) < 0.25f ||
+            fmodf(abs(fragVars.coords.y + sin(uniform.time + fragVars.coords.x)), 0.5f) < 0.1f ||
+            fmodf(abs(fragVars.coords.z), 1.f) < 0.2f)
+            return false;
+    }
+
     // If there is no lighting, return the color with no more modification
     if (!uniform.lighting)
     {
@@ -658,7 +666,11 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
 float4 vertexShader(const rdrVertex& vertex, const Uniform& uniform, Varying& varying)
 {
     // Store triangle vertices positions
-    float4 localCoords = uniform.model * float4(vertex.x, vertex.y, vertex.z, 1.f);
+    float4 localCoords;
+    if (uniform.vertexEffect)
+        localCoords = uniform.model * float4(vertex.x, vertex.y + sin(uniform.time + vertex.x - vertex.z) * 0.5f, vertex.z, 1.f);
+    else
+        localCoords = uniform.model * float4(vertex.x, vertex.y, vertex.z, 1.f);
 
     // Get the world coords and world normals and stock it in the current varying
     varying.coords = localCoords.xyz / localCoords.w;
@@ -932,6 +944,13 @@ void rdrShowImGuiControls(rdrImpl* renderer)
 
         if (renderer->fillTriangle)
         {
+            #pragma region Shader tree
+            {
+                ImGui::Checkbox("Vertex effect", &renderer->uniform.vertexEffect);
+                ImGui::Checkbox("Pixel effect", &renderer->uniform.pixelEffect);
+            }
+            #pragma endregion
+
             #pragma region Texture filtering
             {
                 const char* filterTypeStr[] = { "NEAREST", "BILINEAR" };

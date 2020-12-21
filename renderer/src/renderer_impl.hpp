@@ -75,6 +75,9 @@ struct Uniform
     mat4x4 view;
     mat4x4 projection;
 
+    bool vertexEffect = false;
+    bool pixelEffect = false;
+
     bool msaa = true;
 
     bool depthTest = true;

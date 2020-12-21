@@ -1,18 +1,18 @@
-# Blender MTL File: 'Temp.blend'
+# Blender MTL File: 'None'
 # Material Count: 24
 
-newmtl Barrel_Material
+newmtl Barrel_Material.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
+Ks 0.000000 0.000000 0.000000 
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
 illum 2
 map_Kd textures\\TexturesCom_WoodPlanksBeamed0118_10_seamless_S.jpeg
 
-newmtl Blue_Light_Emission.001
+newmtl Blue_Light_Emission.002
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -22,7 +22,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Blue_Light_Glass.001
+newmtl Blue_Light_Glass.002
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -32,40 +32,40 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Christmas_Tree_Leaf
+newmtl Christmas_Tree_Leaf.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
+Ks 0.000000 0.000000 0.000000 
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
 illum 2
 map_Kd textures\\38294725034_ddffa1310c_b.jpeg
 
-newmtl Christmas_Tree_Material
+newmtl Christmas_Tree_Material.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
+Ks 0.000000 0.000000 0.000000 
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
-map_Kd textures\\Christmas_Tree_UV_Map.png
 illum 2
+map_Kd textures\\Christmas_Tree_UV_Map.png
 
-newmtl Earth_Material
+newmtl Earth_Material.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
+Ks 0.000000 0.000000 0.000000 
 Ke 0.000000 0.000000 0.000000
 Ni 1.000000
 d 1.000000
 illum 2
 map_Kd textures\\Earth_256X256.jpeg
 
-newmtl Golden_Star_Material
+newmtl Golden_Star_Material.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -75,17 +75,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Green_Blue_Light_Emission
-Ns 225.000000
-Ka 1.000000 1.000000 1.000000
-Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.7500000 0.750000
-Ni 1.000000
-d 1.000000
-illum 2
-
-newmtl Green_Blue_Light_Emission.001
+newmtl Green_Blue_Light_Emission.002
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -95,7 +85,27 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Green_Light_Glass
+newmtl Green_Blue_Light_Emission.003
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.750000 0.750000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl Green_Light_Glass.002
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.750000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl Green_Light_Glass.003
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -105,17 +115,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Green_Light_Glass.001
-Ns 225.000000
-Ka 1.000000 1.000000 1.000000
-Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.75000000 0.000000
-Ni 1.000000
-d 1.000000
-illum 2
-
-newmtl Light_Emission
+newmtl Light_Emission.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -125,7 +125,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Light_Glass
+newmtl Light_Glass.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -135,7 +135,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Metal_Material
+newmtl Metal_Material.003
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -145,7 +145,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Metal_Material.001
+newmtl Metal_Material.004
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -155,7 +155,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Metal_Material.002
+newmtl Metal_Material.005
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -165,7 +165,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Plastic_Light_Base_Material
+newmtl Plastic_Light_Base_Material.004
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -175,7 +175,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Plastic_Light_Base_Material.001
+newmtl Plastic_Light_Base_Material.005
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -185,7 +185,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Plastic_Light_Base_Material.002
+newmtl Plastic_Light_Base_Material.006
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -195,7 +195,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Plastic_Light_Base_Material.003
+newmtl Plastic_Light_Base_Material.007
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -205,17 +205,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Red__Opaque_Bauble_Material
-Ns 225.000000
-Ka 1.000000 1.000000 1.000000
-Kd 0.800000 0.800000 0.800000
-Ks 0.500000 0.500000 0.500000
-Ke 1.000000 0.000000 0.000000
-Ni 1.000000
-d 1.000000
-illum 2
-
-newmtl Red__Opaque_Bauble_Material.001
+newmtl Red__Opaque_Bauble_Material.002
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -225,7 +215,17 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Transparent_Bauble_Material
+newmtl Red__Opaque_Bauble_Material.003
+Ns 225.000000
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 1.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+
+newmtl Transparent_Bauble_Material.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000
@@ -235,7 +235,7 @@ Ni 1.000000
 d 1.000000
 illum 2
 
-newmtl Wooden_Star_Material
+newmtl Wooden_Star_Material.001
 Ns 225.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.800000 0.800000 0.800000

@@ -16,12 +16,16 @@
 
 int scnImpl::loadTexture(const char* filePath)
 {
+    // Check if there is already a texture with this filepath in the list of the scene
     std::vector<Texture>::iterator it = std::find_if(textures.begin(), textures.end(),
                                         [filePath](Texture& t)
                                         { return t.fileName.compare(filePath) == 0; });
     
+    // If there is one, return its index
     if (it != textures.end())
         return it - textures.begin();
+
+    // Else add load a new texture with stb and return the new index, if the loaded texture is valid
 
     Texture texture;
     texture.fileName = filePath;
@@ -44,6 +48,7 @@ int scnImpl::loadMaterial(float ambient[3], float diffuse[3], float specular[3],
     mat.emissionColor = float4(emissive[0], emissive[1], emissive[2], 0.f);
     mat.shininess = shininess;
 
+    // Check if there is already a material like that in the list of the scene
     std::vector<Material>::iterator it = std::find_if(materials.begin(), materials.end(),
                                         [mat](const Material& m)
                                         {
@@ -54,9 +59,11 @@ int scnImpl::loadMaterial(float ambient[3], float diffuse[3], float specular[3],
                                                    m.emissionColor == mat.emissionColor;
                                         });
 
+    // If there is one, return its index
     if (it != materials.end())
         return it - materials.begin();
 
+    // Else add it to the list and return the new index
     materials.push_back(mat);
 
     return materials.size() - 1;
@@ -141,13 +148,11 @@ bool scnImpl::loadObject(Object& object, std::string filePath, std::string mtlBa
                     vertice.a = attrib.colors.size() == 4 ? attrib.colors[3 * idx.vertex_index + 3] : 1.f;
                 }
 
-                if (!attrib.texcoords.empty() && idx.texcoord_index > 0)
+                if (!attrib.texcoords.empty())
                 {
                     vertice.u = attrib.texcoords[2 * idx.texcoord_index + 0];
                     vertice.v = attrib.texcoords[2 * idx.texcoord_index + 1];
                 }
-                else
-                    vertice.u = vertice.v = 0.f;
 
                 face.vertices[v] = vertice;
             }
@@ -262,18 +267,24 @@ scnImpl::scnImpl()
 {
     stbi_set_flip_vertically_on_load(1);
 
+    // Lights initialization
     lights[0].isEnable = true;
     lights[0].diffuse = { 1.f, 0.f, 0.f, 1.f };
-    lights[0].lightPos = { -5.f, 5.f, 0.f, 1.f };
+    lights[0].specular = { 1.f, 0.f, 0.f, 1.f };
+    lights[0].lightPos = { -0.5f, 0.f, -11.f, 1.f };
 
     lights[1].isEnable = true;
     lights[1].diffuse = { 0.f, 0.f, 1.f, 1.f };
-    lights[1].lightPos = { 5.f, -5.f, 0.f, 1.f };
+    lights[1].specular = { 0.f, 0.f, 1.f, 1.f };
+    lights[1].lightPos = { 1.f, 0.f, -9.f, 1.f };
+    lights[1].quadraticAttenuation = 0.35f;
 
     lights[2].isEnable = true;
     lights[2].diffuse = { 0.f, 1.f, 0.f, 1.f };
-    lights[2].lightPos = { 0.f, 2.5f, -5.f, 1.f };
+    lights[2].specular = { 0.f, 1.f, 0.f, 1.f };
+    lights[2].lightPos = { 0.f, 0.f, 1.f, 0.f };
 
+    // Objects initialization
     Object obj0({ 0.f, -3.f, -10.f });
     loadObject(obj0, "assets/christmas-tree/christmas-tree.obj", "assets/christmas-tree/");
     objects.push_back(obj0);
@@ -281,6 +292,28 @@ scnImpl::scnImpl()
     Object obj1({ 0.f, 0.f, -0.5f });
     loadQuad(obj1, loadTexture("assets/window.png"));
     objects.push_back(obj1);
+
+    Object obj2({ 0.f, 0.f, -15.f }, { 0.f, M_PI_2, 0.f });
+    loadObject(obj2, "assets/christmas-star/star.obj", "assets/christmas-star/", 0.1f);
+    objects.push_back(obj2);
+
+    // Create 2 objects with the same mesh of the last one (star)
+    Object obj3({ -5.f, 0.f, -10.f });
+    obj3.mesh = obj2.mesh;
+    objects.push_back(obj3);
+
+    Object obj4({ 5.f, 0.f, -10.f });
+    obj4.mesh = obj2.mesh;
+    objects.push_back(obj4);
+
+    Object obj5({ 10.f, 0.f, -15.f });
+    loadObject(obj5, "assets/christmas-ornament/ornament.obj", "assets/christmas-ornament/", 50.f);
+    objects.push_back(obj5);
+
+    // Create 1 object with the same mesh of the last one (the ornament)
+    Object obj6({ 20.f, 0.f, -15.f }, { 0.f, 0.f, 0.f }, {0.5f, 0.5f, 0.5f});
+    obj6.mesh = obj5.mesh;
+    objects.push_back(obj6);
 }
 
 // Unload the scene
@@ -291,7 +324,7 @@ scnImpl::~scnImpl()
         stbi_image_free(texture.data);
 }
 
-void editLights(rdrImpl* renderer, scnImpl* scene)
+void editLights(scnImpl* scene)
 {
     static int selectedLight = 0;
     if (ImGui::TreeNode("Lights"))
@@ -374,6 +407,7 @@ void scnImpl::drawObject(Object object, rdrImpl* renderer)
     // Then draw all his mesh
     for (const Mesh& mesh : object.mesh)
     {
+        // Set the material and the texture of the current mesh
         if (mesh.materialIndex >= 0)
             rdrSetUniformMaterial(renderer, (rdrMaterial*)&materials[mesh.materialIndex]);
 
@@ -393,7 +427,7 @@ void scnImpl::drawObject(Object object, rdrImpl* renderer)
 
 std::vector<Object> sortObjects(std::vector<Object> objects, const float3& cameraPos)
 {
-    // Sort all objects with their distance to the camera
+    // Sort all objects with their distance to the camera by getting their model matrix
     sort(objects.begin(), objects.end(),
         [cameraPos](const Object& a, const Object& b)
     {
@@ -407,16 +441,34 @@ std::vector<Object> sortObjects(std::vector<Object> objects, const float3& camer
 
 void scnImpl::update(float deltaTime, rdrImpl* renderer)
 {
-    editLights(renderer, this);
-
     for (int i = 0; i < IM_ARRAYSIZE(lights); i++)
         rdrSetUniformLight(renderer, i, (rdrLight*)&lights[i]);
 
-
     time += deltaTime;
 
+    // Make the tree rotate on itself
     objects[0].rotation.y = time * 0.25f;
 
+    // Change stars ambient color
+    materials[12].ambientColor.r = (sin(time) + 1.f) * 0.5f;
+    materials[12].ambientColor.g = (cosf(time) + 1.f) * 0.5f;
+    materials[12].ambientColor.b = (1.f - sinf(time)) * 0.5f;
+
+    // Make the stars ossilate
+    objects[2].position.y = sin(time * 2.f) * 3.f + 2.f;
+    objects[3].position.y = sin(time) * 3.f;
+    objects[4].position.y = sin(time * 0.5f) * 3.f + 1.f;
+
+    // Make the stars rotate on themselves
+    objects[2].rotation.y = time * 0.25f;
+    objects[3].rotation.x = time * 0.25f;
+    objects[4].rotation.z = time * 0.25f;
+
+    // Change their size
+    objects[2].scale.y = (sin(time) + 2.f) * 0.5f;
+    objects[3].scale.x = sin(time);
+    objects[3].scale.z = sin(time);
+    objects[4].scale.y = (sin(time) + 2.f) * 0.25f;
 
     // Sort objects
     std::vector<Object> sortedObjects = sortObjects(objects, cameraPos);
@@ -428,6 +480,7 @@ void scnImpl::update(float deltaTime, rdrImpl* renderer)
 
 void scnImpl::showImGuiControls()
 {
+    editLights(this);
     editObjects(this);
     editMaterials(this);
 }
