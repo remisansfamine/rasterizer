@@ -76,9 +76,7 @@ struct scnImpl
 {
     scnImpl();
     ~scnImpl();
-    void update(float deltaTime, rdrImpl* renderer);
 
-    void showImGuiControls();
 
     std::vector<Object> objects;
     std::vector<Texture> textures;
@@ -90,16 +88,23 @@ struct scnImpl
 
     float3 cameraPos = { 0.f, 0.f, 0.f };
 
-    bool loadObject(Object& object, std::string filePath, std::string mtlBasedir, float scale = 1.f);
-    void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int hRes = 1, int vRes = 1);
-    void loadTriangle(Object& object, int textureIndex = -1, int materialIndex = 0);
 
-    int  loadTexture(const char* filePath);
-    int  loadMaterial(float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess);
 
+
+
+    void update(float deltaTime, rdrImpl* renderer);
+
+    void showImGuiControls();
 
     private:
         void drawObject(Object object, rdrImpl* renderer);
+
+        int  loadTexture(const char* filePath);
+        int  loadMaterial(float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess);
+
+        bool loadObject(Object& object, std::string filePath, std::string mtlBasedir, float scale = 1.f);
+        void loadQuad(Object& object, int textureIndex = -1, int materialIndex = 0, int hRes = 1, int vRes = 1);
+        void loadTriangle(Object& object, int textureIndex = -1, int materialIndex = 0);
 
         double time = 0.0;
 };
