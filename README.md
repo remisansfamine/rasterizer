@@ -1,6 +1,6 @@
 Rasterization rendering
 ===
-CPU Rendering library written in C++ 17 for C/C++ with a scene loader (using stb, TinyObjLoader, GLFW and ImGui) accompanied by a mathematics library.
+CPU Rendering library written in C++ 17 for C/C++ with a scene loader (using stb, TinyObjLoader, GLFW and ImGui) and a mathematics library.
 
 **/!\\ CPU Software renderers are not performant nor efficient, it is not recommended to use them on a serious project. Use it at your own risk. /!\\**
 
@@ -155,7 +155,7 @@ Lighting using Gouraud and Phong shading: diffuse, specular, emissive and attenu
 
 ![Blending](/annexes/blending.gif)
 
-Depth test and blending using a transparent texture.
+Depth test and blending using a transparent texture (this scene uses Gouraud shading with a red light, a blue and another green and a gray ambient visible on the window).
 
 ![Face culling](/annexes/face_cull.gif)
 
@@ -177,18 +177,23 @@ Post-processing effects: MSAA, Box blur and Gaussian blur.
 # References
 
 Viewport:
+---
 - Gives the formula to convert normalized device coordinates to viewport coordinates (here the viewport is the screen): https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glViewport.xhtml
 
 Rasterization:
+---
 - Shows how the triangle rasterization works and how to use the top-left rule: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/rasterization-stage
 
 Perspective correction:
+---
 - Shows the technique to correct the perspective: https://www.scratchapixel.com/lessons/3d-basic-rendering/rasterization-practical-implementation/perspective-correct-interpolation-vertex-attributes
 
 Face culling:
+---
 - Shows the method to use the face culling: https://www.students.cs.ubc.ca/~cs-314/notes/cull.html
 
 Lighting:
+---
 - Shows the differences between Gouraud shading and Phong shading: https://en.wikipedia.org/wiki/Gouraud_shading
 - Shows the principle of Phong shading: https://en.wikipedia.org/wiki/Phong_shading
 - Gives an alternative to the Phong model: https://en.wikipedia.org/wiki/Blinn%E2%80%93Phong_reflection_model
@@ -196,21 +201,26 @@ Lighting:
 - Shows how OpenGL uses its light systeme and how materials and light are related: https://www.glprogramming.com/red/chapter05.html
 
 Blending:
+---
 - Shows how to use the blending and the issues with the blending (like sorting the render order): https://learnopengl.com/Advanced-OpenGL/Blending
 
 Clipping:
+---
 - Gives the main structure of the algorithm: https://fabiensanglard.net/polygon_codec/
 - Shows how to use outcodes: https://en.wikipedia.org/wiki/Cohen%E2%80%93Sutherland_algorithm
 - Shows the complexity of the algorithm: https://en.wikipedia.org/wiki/Sutherland%E2%80%93Hodgman_algorithm
 
 Bilinear filtering:
+---
 - Shows how to use bilinear filtering using bilinear interpolation: https://www.scratchapixel.com/lessons/mathematics-physics-for-computer-graphics/interpolation/bilinear-filtering
 - Shows the principle of bilinear filtering: https://docs.microsoft.com/en-us/windows/win32/direct3d9/bilinear-texture-filtering
 
 Post-process effects:
+---
 - Gives some exemples of post-process effects: https://en.wikipedia.org/wiki/Kernel_(image_processing)
 
 MSAA:
+---
 - Shows the principle of anti-aliasing: https://docs.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-rasterizer-stage-rules
 - Shows how to arrange samples: https://mynameismjp.wordpress.com/2012/10/24/msaa-overview/
 
@@ -248,6 +258,14 @@ MSAA:
 <div id='sceneusage'/>
 
 # Usage
+
+Controls
+---
+- WASD/ZQSD/Array keys: Move foward, backward, left and right.
+- Space: Move upward.
+- Left Shit: Move downward.
+- NUMPAD+/NUMPAD-: Change the velocity of the camera.
+
 Initialization
 ---
 ```c++
@@ -345,7 +363,7 @@ Vertex
 Light
 ---
 ```
-bool     enabled                | Current state
+  bool   enabled                | Current state
 4 floats position -> x, y, z, w | Position and light type (w)
 4 floats ambient  -> r, g, b, a | Ambient color
 4 floats diffuse  -> r, g, b, a | Diffuse color
