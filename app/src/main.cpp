@@ -177,8 +177,8 @@ int main(int argc, char* argv[])
             inputs.moveBackward = ImGui::IsKeyDown(GLFW_KEY_DOWN) || ImGui::IsKeyDown(GLFW_KEY_S);
             inputs.moveUpward = ImGui::IsKeyDown(GLFW_KEY_SPACE);
             inputs.moveDownward = ImGui::IsKeyDown(GLFW_KEY_LEFT_SHIFT);
-            inputs.moveLeft = ImGui::IsKeyDown(GLFW_KEY_A);
-            inputs.moveRight = ImGui::IsKeyDown(GLFW_KEY_D);
+            inputs.moveLeft = ImGui::IsKeyDown(GLFW_KEY_A) || ImGui::IsKeyDown(GLFW_KEY_LEFT);
+            inputs.moveRight = ImGui::IsKeyDown(GLFW_KEY_D) || ImGui::IsKeyDown(GLFW_KEY_RIGHT);
             inputs.speedUp = ImGui::IsKeyDown(GLFW_KEY_KP_ADD);
             inputs.speedDown = ImGui::IsKeyDown(GLFW_KEY_KP_SUBTRACT);
             camera.update(ImGui::GetIO().DeltaTime, inputs);

@@ -102,6 +102,7 @@ struct scnImpl
         int  loadMaterial(float ambient[3], float diffuse[3], float specular[3], float emissive[3], float shininess);
 
         // Add to the input object several meshes loaded by TinyObjLoader using the input filepath
+        // The first string is the filepath of the .obj, the second one is the filepath of the material
         bool loadObject(Object& object, std::string filePath, std::string mtlBasedir, float scale = 1.f);
 
         // Add to the input object a quad mesh with a customizable subdivision, a texture and a material
