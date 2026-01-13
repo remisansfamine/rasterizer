@@ -58,7 +58,7 @@ typedef struct rdrMaterial
 // Color and depth buffer have to be valid until the shutdown of the renderer
 // Color buffer is RGBA, each component is a 32 bits float
 // Depth buffer is a buffer of 32bits floats
-RDR_API rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height);
+RDR_API rdrImpl* rdrInit(float** colorBuffer32Bits, float* depthBuffer, int width, int height);
 RDR_API void rdrShutdown(rdrImpl* renderer);
 
 // Post-process events

@@ -19,11 +19,11 @@ struct clipPoint
     float3 weights = { 0.f, 0.f, 0.f };
 };
 
-rdrImpl* rdrInit(float* colorBuffer32Bits, float* depthBuffer, int width, int height)
+rdrImpl* rdrInit(float** colorBuffer32Bits, float* depthBuffer, int width, int height)
 {
     rdrImpl* renderer = new rdrImpl();
 
-    renderer->fb.colorBuffer = reinterpret_cast<float4*>(colorBuffer32Bits);
+    renderer->fb.colorBufferRef = reinterpret_cast<float4**>(colorBuffer32Bits);
     renderer->fb.depthBuffer = depthBuffer;
     renderer->fb.msaaColorBuffer = new float4[width * height * NB_SAMPLES]();
     renderer->fb.msaaDepthBuffer = new float[width * height * NB_SAMPLES]();
@@ -97,7 +97,7 @@ void resolveMSAA(Framebuffer& fb)
             depthSum += fb.msaaDepthBuffer[msaaIndex + k];
         }
 
-        fb.colorBuffer[i] = colorSum / NB_SAMPLES;
+        (*fb.colorBufferRef)[i] = colorSum / NB_SAMPLES;
         fb.depthBuffer[i] = depthSum / NB_SAMPLES;
     }
 
@@ -108,7 +108,7 @@ void resolveMSAA(Framebuffer& fb)
 
 void rdrFinish(rdrImpl* renderer)
 { 
-    float4* color = renderer->fb.colorBuffer;
+    float4* color = *renderer->fb.colorBufferRef;
 
     #pragma region Resolve MSAA
 
@@ -247,7 +247,7 @@ void drawLine(const Framebuffer& fb, int x0, int y0, int x1, int y1, const float
                     fb.msaaColorBuffer[index * NB_SAMPLES + k] = color;
             }
             else
-                fb.colorBuffer[index] = color;
+                *fb.colorBufferRef[index] = color;
         }
 
         if (x0 == x1 && y0 == y1) break;
@@ -645,7 +645,7 @@ void rasterTriangle(const Framebuffer& fb, const float4 screenCoords[3], const V
             #pragma region Set the depth and the fragment color to the valid pixel
             else
             {
-                float4* colorBuffer = &fb.colorBuffer[fbIndex];
+                float4* colorBuffer = fb.colorBufferRef[fbIndex];
 
                 // If there is blending, get the last pixel in the colorBuffer and add it to the fragment color
                 if (uniform.blending && fragColor.a < 1.f)

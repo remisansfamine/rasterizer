@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
 
     // Init renderer
     rdrImpl* renderer = rdrInit(
-        framebuffer.getColorBuffer(),
+        framebuffer.getColorBufferRef(),
         framebuffer.getDepthBuffer(),
         framebuffer.getWidth(), framebuffer.getHeight());
 
