@@ -27,6 +27,8 @@ struct Framebuffer
 private:
     int width = 0;
     int height = 0;
+    unsigned int pixelBufferID = 0u;
+    static constexpr unsigned int bufferingCount = 2u;
 
     // In-RAM buffers
     float4* colorBufferPtr = nullptr;
@@ -35,5 +37,5 @@ private:
 
     // OpenGL texture (in VRAM)
     GLuint colorTexture = 0;
-    GLuint colorPixelBuffer = 0;
+    GLuint colorPixelBuffers[bufferingCount] = { 0u };
 };

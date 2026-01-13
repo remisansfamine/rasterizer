@@ -7,10 +7,14 @@ Framebuffer::Framebuffer(int width, int height)
     , height(height)
     , depthBuffer(width* height)
 {
-    glGenBuffers(1, &colorPixelBuffer);
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffer);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * sizeof(float4), nullptr, GL_DYNAMIC_DRAW);
+    glGenBuffers(bufferingCount, colorPixelBuffers);
+    for (GLuint i = 0u; i < bufferingCount; i++)
+    {
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffers[i]);
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * sizeof(float4), nullptr, GL_DYNAMIC_DRAW);
+    }
 
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffers[pixelBufferID]);
     colorBufferPtr = static_cast<float4*>(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, width * height * sizeof(float4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
 
     // Avoid binding future textures with the pixel buffer
@@ -27,11 +31,11 @@ Framebuffer::~Framebuffer()
 {
     if (colorBufferPtr)
     {
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffer);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffers[pixelBufferID]);
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         colorBufferPtr = nullptr;
     }
-    glDeleteBuffers(1, &colorPixelBuffer);
+    glDeleteBuffers(bufferingCount, colorPixelBuffers);
 
     glDeleteTextures(1, &colorTexture);
 }
@@ -64,7 +68,10 @@ void Framebuffer::clear()
 
 void Framebuffer::updateTexture()
 {
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffer);
+    const GLuint uploadPBO = colorPixelBuffers[pixelBufferID];
+    const unsigned int pixelBufferNextID = (pixelBufferID + 1u) % bufferingCount;
+
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, uploadPBO);
     if (colorBufferPtr)
     {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
@@ -75,7 +82,11 @@ void Framebuffer::updateTexture()
     // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, colorBufferPtr);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_FLOAT, 0);
 
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, colorPixelBuffer);
+    const GLuint mapPBO = colorPixelBuffers[pixelBufferNextID];
+
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, mapPBO);
     colorBufferPtr = static_cast<float4*>(glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, width * height * sizeof(float4), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+    pixelBufferID = pixelBufferNextID;
 }
