@@ -104,9 +104,53 @@ static void newFrame(bool mouseCaptured)
     ImGui::NewFrame();
 }
 
-static void endFrame(GLFWwindow* window)
+static void presentFrame(GLuint transitionFramebuffer, int windowWidth, int windowHeight, int frameWidth, int frameHeight)
+{
+    const float frameAspect = static_cast<float>(frameWidth) / static_cast<float>(frameHeight);
+    const float windowAspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
+    
+    int dstX0, dstY0, dstX1, dstY1;
+    if (windowAspect > frameAspect)
+    {
+        const int dstW = int(windowHeight * frameAspect);
+        const int dstH = windowHeight;
+        dstX0 = (windowWidth - dstW) / 2.f;
+        dstY0 = 0;
+        dstX1 = dstX0 + dstW;
+        dstY1 = dstH;
+    }
+    else
+    {
+        const int dstW = windowWidth;
+        const int dstH = int(windowWidth / frameAspect);
+        dstX0 = 0;
+        dstY0 = (windowHeight - dstH) / 2.f;
+        dstX1 = dstW;
+        dstY1 = dstY0 + dstH;
+    }
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, transitionFramebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+    glBlitFramebuffer(0, frameHeight, frameWidth, 0,   // src rect with mirrored height to flip the result
+                      dstX0, dstY0, dstX1, dstY1,   // dst rect
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
+static void endFrame(GLFWwindow* window, GLuint transitionFramebuffer, const Framebuffer& framebufferToPresent)
 {
     glClear(GL_COLOR_BUFFER_BIT);
+
+    int windowWidth = 0;
+    int windowHeight = 0;
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);
+
+    // Display framebuffer (renderer output)
+    presentFrame(transitionFramebuffer, windowWidth, windowHeight, framebufferToPresent.getWidth(), framebufferToPresent.getHeight());
+
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -129,6 +173,17 @@ int main(int argc, char* argv[])
         framebuffer.getColorBufferRef(),
         framebuffer.getDepthBuffer(),
         framebuffer.getWidth(), framebuffer.getHeight());
+
+    GLuint transitionFramebuffer;
+    glGenFramebuffers(1, &transitionFramebuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, transitionFramebuffer); // source = READ
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, framebuffer.getColorTexture(), 0);
+
+    GLenum status = glCheckFramebufferStatus(GL_READ_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+    {
+        printf("transitionFramebuffer incomplete: 0x%x\n", status);
+    }
 
     rdrSetImGuiContext(renderer, ImGui::GetCurrentContext());
 
@@ -203,6 +258,7 @@ int main(int argc, char* argv[])
         rdrFinish(renderer);
         framebuffer.updateTexture();
 
+
         // Display debug controls
         if (ImGui::Begin("Config"))
         {
@@ -246,21 +302,21 @@ int main(int argc, char* argv[])
         if (captureGif)
             gifRecorder.frame(framebuffer.getColorBuffer());
 
-        ImGui::Begin("Framebuffer");
-        ImGui::Text("(Right click to capture mouse, Esc to un-capture)");
-        // Display framebuffer (renderer output)
-        ImGui::Image((ImTextureID)(size_t)framebuffer.getColorTexture(), { (float)framebuffer.getWidth(), (float)framebuffer.getHeight() });
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+        ImDrawList* draw = ImGui::GetForegroundDrawList();
+        draw->AddText(ImVec2(10, 10), IM_COL32_WHITE, "(Right click to capture mouse, Esc to un-capture)");
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Right))
         {
             mouseCaptured = true;
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         }
-        ImGui::End();
 
         //ImGui::ShowDemoWindow();
         ImGui::ShowMetricsWindow();
-        endFrame(window);
+        endFrame(window, transitionFramebuffer, framebuffer);
     }
+
+    glDeleteBuffers(1, &transitionFramebuffer);
 
     scnDestroy(scene);
     rdrShutdown(renderer);
